@@ -1,0 +1,197 @@
+{
+  "eps_thr": 1.6692685160152538,
+  "or_false_alarm": 0.050333333333333334,
+  "missed_catastrophe": {
+    "clean": {
+      "n_cata": 300,
+      "u_z": 0.77,
+      "d_z": 0.9533333333333334,
+      "c_z": 0.18000000000000005,
+      "PORTFOLIO": 0.5833333333333333
+    },
+    "extrapolation": {
+      "n_cata": 2817,
+      "u_z": 0.2417465388711395,
+      "d_z": 0.3947461838835641,
+      "c_z": 0.06176783812566555,
+      "PORTFOLIO": 0.1285055023074192
+    },
+    "physics_shift": {
+      "n_cata": 307,
+      "u_z": 0.7785016286644951,
+      "d_z": 0.9511400651465798,
+      "c_z": 0.15309446254071657,
+      "PORTFOLIO": 0.6286644951140066
+    },
+    "id_holdout": {
+      "n_cata": 309,
+      "u_z": 0.883495145631068,
+      "d_z": 0.9385113268608414,
+      "c_z": 0.11974110032362462,
+      "PORTFOLIO": 0.5760517799352751
+    }
+  },
+  "detect_auroc": {
+    "extrapolation": {
+      "u_z": 0.9173459444444444,
+      "d_z": 0.7981319166666667,
+      "c_z": 0.8502197777777778
+    },
+    "physics_shift": {
+      "u_z": 0.5,
+      "d_z": 0.5,
+      "c_z": 0.5054254722222222
+    }
+  },
+  "gate_a": {
+    "floor": 0.6,
+    "surface": "z_next",
+    "target": "qdd_window = (qd_{t+S*dt} - qd_t)/(S*dt)",
+    "clean": 0.44431237670062995,
+    "physics_shift": 0.405864729178939,
+    "pooled": 0.4247809858860266,
+    "diag_raw_obs_next+a": {
+      "clean": 0.4342276853853192,
+      "physics_shift": 0.48315553787787113,
+      "pooled": 0.4591410949714012
+    },
+    "PASS": false
+  },
+  "gate_b": {
+    "auroc_dz": 0.5,
+    "auroc_uz": 0.5,
+    "band": [
+      0.45,
+      0.55
+    ],
+    "max_abs_delta_dz": 0.0,
+    "max_abs_delta_uz": 0.0,
+    "PASS": true
+  },
+  "delta_gate": {
+    "floor": 0.3,
+    "nuisance": "paired",
+    "target": "delta_z_next -> delta_qdd_window (shift - clean)",
+    "mean": -0.17479535219733988,
+    "std": 0.015865795564328985,
+    "per_seed": [
+      -0.1523880129874271,
+      -0.18498978175030123,
+      -0.1870082618542913
+    ],
+    "per_joint": [
+      -0.1650246128224946,
+      -0.13975141315235962
+    ],
+    "spearman_delta_mag": 0.44347821370772816,
+    "nonjittered_mean": -0.16201022727333378,
+    "PASS": false
+  },
+  "accel_recoverability": {
+    "recover_floor": 0.6,
+    "S_dt": 0.08,
+    "qdd_window": {
+      "z_next+a": 0.44431237670062995,
+      "obs_next+a": 0.4342276853853192,
+      "obs_next": 0.4464409749884891,
+      "z_next": 0.3653873342853292
+    },
+    "qdd_instant_diagnostic": {
+      "obs_next+a": 0.40036144492757064,
+      "z_next+a": 0.27679020557247164
+    },
+    "qdd_pose_curv_diagnostic": {
+      "obs_next+a": 0.5025783386558911,
+      "z_next+a": 0.39154513431981525
+    },
+    "gate_a_per_regime": {
+      "clean": 0.4342276853853192,
+      "physics_shift": 0.48315553787787113,
+      "pooled": 0.4591410949714012
+    }
+  },
+  "ae_capacity": {
+    "target": "qdd_window",
+    "pca_components": 12,
+    "capacity_matched_obs_next+a": {
+      "mean": 0.345326129204061,
+      "std": 0.056746049872516253,
+      "per_seed": [
+        0.37288114851166526,
+        0.3968227487855028,
+        0.266274490315015
+      ]
+    },
+    "z_next+a": {
+      "mean": 0.4291685140631511,
+      "std": 0.011731660707653942,
+      "per_seed": [
+        0.44431237670062995,
+        0.41572756555648777,
+        0.4274655999323356
+      ]
+    },
+    "raw_obs_next+a_diagnostic": 0.4342276853853192,
+    "margin": 0.125,
+    "probe_noise_floor": 0.0684777105801702,
+    "gap": -0.08384238485909007,
+    "consequence_reached_latent": true
+  },
+  "linear_probe_r2": {
+    "per_target_q1_q2_qd1_qd2": [
+      0.6422157580053844,
+      0.05123047478169407,
+      0.18886051982441165,
+      0.062474388740471176
+    ],
+    "mean": 0.23619528533799033,
+    "band": [
+      0.3,
+      0.9
+    ],
+    "role": "laundering ceiling: R2>0.9 => latent recovered privileged state"
+  },
+  "nonlinear_probe_r2": {
+    "per_target_q1_q2_qd1_qd2": [
+      0.7420489243736506,
+      0.32182282455559397,
+      0.7169364421684523,
+      0.4845757049493704
+    ],
+    "mean": 0.5663459740117669,
+    "role": "vacuity floor: low even here => latent truly discarded state"
+  },
+  "spearman": {
+    "c_z_vs_r": -0.19247430106006197,
+    "c_z_vs_d_z": 0.22119457097146317,
+    "rho_max_for_orthogonal": 0.8
+  },
+  "recon_gate": {
+    "ae_recon_clean": 0.005157649775462221,
+    "mean_frame_baseline": 0.0184034929742051,
+    "beat_factor_required": 1.5,
+    "beats_baseline": true,
+    "recon_physics_shift": 0.005098920446989055,
+    "shift_ratio": 0.9886131606412698,
+    "shift_ratio_max": 1.5,
+    "shift_comparable": true,
+    "per_regime": {
+      "clean": 0.005157649775462221,
+      "extrapolation": 0.009859879807876242,
+      "physics_shift": 0.005098920446989055,
+      "id_holdout": 0.0050004328841734575
+    },
+    "PASS": true
+  },
+  "training_failed": {
+    "ae": false,
+    "ensemble": false
+  },
+  "verdict": {
+    "label": "VOID-FIDELITY",
+    "interpret_table": false,
+    "reasons": [
+      "GATE A failed on the z_next surface (window-scale qdd; pooled R2=0.42, physics_shift R2=0.41, floor 0.6): even the representation c_z consumes does not carry the window-scale consequence. A render/window-fidelity change is justified (NOT escalated further in this task). Detector table NOT interpreted."
+    ]
+  }
+}

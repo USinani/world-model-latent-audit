@@ -219,8 +219,74 @@ reaches z. The binding failure is the **observation-side gate**: the 24×24 rend
 next move is observation fidelity (higher resolution or a q̈-scale window), after which `c_z` can
 finally be read. Not done here by task constraint.
 
+## LW-11 — latent-surface Gate A + matched-pair delta gate, then read once (two new commits after 151aad0)
+
+**Terminal step of latent v0.** Two commits: `33faabb` (pre-registration: Gate A surface + delta
+gate, code only, still 24×24, no detector reinterpretation) then the 48×48 fidelity change + rerun.
+
+**Why the surface was corrected.** LW-10 gated Gate A on **raw `obs_next` pixels** as the fairness
+upper bound, but its own capacity-matched probe showed `z_next+a` (0.520) **exceeded** PCA-matched
+`obs_next+a` (0.336): the nonlinear AE *concentrates* the consequence, so raw pixels were the wrong
+surface. LW-11 moves the primary Gate A to the representation `c_z` actually consumes (`z_next`),
+adds a **required matched-pair delta gate** (the literal clean→shift difference `c_z` keys on), makes
+the **smallest** observation-fidelity change (`img_size 24 → 48`), and reads the verdict **once**. The
+0.60 bar, Gate B, recon gate, detector semantics, and 5% calibration are all unchanged.
+
+**Pre-registered gate flow (read `c_z` only if all pass):** recon → Gate B (AUROC d_z,u_z ∈
+[0.45,0.55]) → Gate A (`z_next+a → qdd_window` > 0.60 on physics_shift AND pooled) → delta gate
+(`Δz_next → Δqdd_window` mean R² > 0.30, **paired nuisance**) → capacity (`z_next+a ≥` matched
+`obs_next+a − max(margin, noise)`) → `c_z` catches physics_shift? Labels: VOID / LEAK-INVALID /
+VOID-FIDELITY / VOID-CONSEQUENCE-NOT-ENCODED / AE-LIMIT / DEEP RED / GREEN. Terminal constraint: a
+single 48px run; if Gate A fails the terminal label is **VOID-FIDELITY** (no further escalation).
+
+**Delta gate (new), PAIRED nuisance.** `Δz_next = z_shift − z_clean` isolates the hidden-mass
+consequence, so each clean/shift pair is rendered from the **same** per-pair jitter seed (texture
+already fixed) — the poses differ (nominal vs heavy), the noise does not. Dedicated renders, separate
+from the packs' detector renders (untouched). Train deltas from `train_ae` (nominal vs heavy), test
+deltas from the packs' matched poses; 3-seed nonlinear probe + per-joint + Spearman of |Δ|; a
+non-jittered delta reported as the cleanest-possible diagnostic.
+
+**48×48 full-run result.**
+
+GATE B (no input leak): AUROC d_z/u_z = 0.500/0.500, matched-pair max|Δ| = 0.0 → **PASS**.
+RECON (output window): 0.00516 vs mean-frame baseline 0.01840 (**3.6×**), shift/clean ratio 0.99 → **PASS**.
+
+GATE A — `z_next+a → qdd_window` (hard gate, > 0.60 on physics_shift AND pooled):
+
+| surface → qdd_window (nonlinear R²) | clean | physics_shift | pooled |
+|---|---:|---:|---:|
+| **z_next + a** (gate) | 0.444 | 0.406 | **0.425** |
+| raw obs_next + a (diag) | 0.434 | 0.483 | 0.459 |
+
+→ **FAIL** (pooled 0.42, physics_shift 0.41 < 0.60). At 48px the z-surface and the raw-pixel surface
+both sit ~0.42–0.46 — the surface correction no longer separates them, and neither clears the bar.
+
+DELTA GATE — `Δz_next → Δqdd_window` (mean R² > 0.30, paired nuisance): mean **−0.175** ± 0.016
+(per-seed −0.152 / −0.185 / −0.187), per-joint −0.165 / −0.14, Spearman(|Δ|) 0.443, non-jittered
+−0.162 → **FAIL**. The matched clean→shift consequence does **not** linearly/nonlinearly survive into
+`Δz_next` at this fidelity (negative R² = worse than predicting the mean): the literal signal `c_z`
+must key on is absent from the latent difference.
+
+Capacity-matched (PCA→12d, 3 seeds): obs_next+a 0.345 ± 0.057 vs z_next+a 0.429 ± 0.012, gap −0.084
+→ consequence_reached_latent = True (kept for record; not load-bearing once Gate A fails).
+Laundering: linear R²(z→q,q̇) 0.236, nonlinear 0.566 (lossy-but-informative band, unchanged story).
+
+**FINAL LABEL: VOID-FIDELITY** (Gate A fails first in the order). The detector table is **NOT
+interpreted** (saved for record only); the 0.60 bar was not softened. Per the terminal constraint the
+single 48px run is the read: no sixth gate, no further in-task fidelity escalation.
+
+**What 48px taught us (honest).** The minimal fidelity bump did **not** clear the bar; if anything it
+*lowered* the z-surface number vs the 24px run (z_next+a window 0.444 vs LW-10's 0.530) while the test
+set grew. So the LW-10 hope — "the latent already carries window-scale q̈ at ≈0.52, only the pixels
+lag" — does **not** robustly hold once the surface is read on a larger test set at higher resolution
+and the *matched-pair delta* (not the absolute recoverability) is required: the consequence does not
+reliably reach the latent **difference**. This is the terminal verdict of latent v0: with this
+observation/AE/window family, the physics-consequence channel cannot be cleanly read from the learned
+latent, so `c_z` cannot be fairly evaluated against `r`. Any next step (different observation/AE/window
+or an explicitly physics-structured latent) changes the question and needs a new charter.
+
 ## Notes / open threads
 
-- Seeds fixed; full run ~1.5–2 min on CPU. `--quick` for smoke.
+- Seeds fixed; full run ~1.5–2 min at 24px, ~7 min at 48px on CPU. `--quick` for smoke.
 - Possible follow-ups (not done; would need a new charter): multi-step latent rollouts for `c_z`,
   or an explicitly physics-structured latent — both change the question and are out of scope here.

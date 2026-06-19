@@ -41,7 +41,7 @@ class Config:
 
     # ---- latent-phase additions (do not affect the state-space parity run) ----
     # rendering
-    img_size: int = 24              # rendered frame is img_size x img_size grayscale
+    img_size: int = 48              # rendered frame is img_size x img_size grayscale (LW-11: 24->48 fidelity)
     frame_stack: int = 3            # stacked window so qd is inferable, not handed over
     frame_stride: int = 8           # temporal baseline (in dt) between stacked frames
     link_width: float = 0.18        # link half-width (world units) -> arm prominence in pixels

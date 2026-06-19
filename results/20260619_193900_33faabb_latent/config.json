@@ -20,7 +20,7 @@
   "max_iter": 150,
   "seed": 0,
   "quick": false,
-  "img_size": 24,
+  "img_size": 48,
   "frame_stack": 3,
   "frame_stride": 8,
   "link_width": 0.18,
