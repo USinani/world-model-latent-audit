@@ -45,10 +45,10 @@
   },
   "gate_a": {
     "floor": 0.6,
-    "clean": 0.31767302917798124,
-    "physics_shift": 0.3350027289292768,
-    "pooled": 0.3263788056437394,
-    "obs_t_plus_a_diagnostic_clean": 0.3161118312504153,
+    "target": "qdd_window = (qd_{t+S*dt} - qd_t)/(S*dt)",
+    "clean": 0.39362618408079536,
+    "physics_shift": 0.4218574804153688,
+    "pooled": 0.4080135324917679,
     "PASS": false
   },
   "gate_b": {
@@ -64,69 +64,52 @@
   },
   "accel_recoverability": {
     "recover_floor": 0.6,
-    "obs_next+a": {
-      "clean": {
-        "nonlinear_mean": 0.31767302917798124,
-        "nonlinear_per_joint": [
-          0.31865640511530624,
-          0.31668965324065623
-        ]
-      },
-      "physics_shift": {
-        "nonlinear_mean": 0.3350027289292768,
-        "nonlinear_per_joint": [
-          0.33991120576123957,
-          0.330094252097314
-        ]
-      },
-      "pooled": {
-        "nonlinear_mean": 0.3263788056437394,
-        "nonlinear_per_joint": [
-          0.32934909877032015,
-          0.32340851251715863
-        ]
-      }
+    "S_dt": 0.08,
+    "qdd_window": {
+      "obs_next+a": 0.39362618408079536,
+      "z_next+a": 0.5297220019450517,
+      "obs_next": 0.3695856633063417,
+      "z_next": 0.442217806006025
     },
-    "z_next+a": {
-      "nonlinear_mean": 0.3831016104494877,
-      "nonlinear_per_joint": [
-        0.3841009240038423,
-        0.3821022968951331
-      ]
+    "qdd_instant_diagnostic": {
+      "obs_next+a": 0.31767302917798124,
+      "z_next+a": 0.3831016104494877
     },
-    "obs_next": {
-      "nonlinear_mean": 0.31281145066462196,
-      "nonlinear_per_joint": [
-        0.3412623997376669,
-        0.284360501591577
-      ]
+    "qdd_pose_curv_diagnostic": {
+      "obs_next+a": 0.4556514688241194,
+      "z_next+a": 0.523554275328153
     },
-    "z_next": {
-      "nonlinear_mean": 0.3112094185312942,
-      "nonlinear_per_joint": [
-        0.3352802839143272,
-        0.2871385531482612
-      ]
-    },
-    "obs_t+a": {
-      "nonlinear_mean": 0.3161118312504153,
-      "nonlinear_per_joint": [
-        0.3335780119284909,
-        0.2986456505723397
-      ]
-    },
-    "z_t+a": {
-      "nonlinear_mean": 0.33751713340012945,
-      "nonlinear_per_joint": [
-        0.349914324680241,
-        0.32511994212001794
-      ]
+    "gate_a_per_regime": {
+      "clean": 0.39362618408079536,
+      "physics_shift": 0.4218574804153688,
+      "pooled": 0.4080135324917679
     }
   },
   "ae_capacity": {
-    "obs_next+a_clean": 0.31767302917798124,
-    "z_next+a_clean": 0.3831016104494877,
+    "target": "qdd_window",
+    "pca_components": 12,
+    "capacity_matched_obs_next+a": {
+      "mean": 0.3363656035020289,
+      "std": 0.0160865193907041,
+      "per_seed": [
+        0.3187164810834004,
+        0.35762179845556386,
+        0.3327585309671224
+      ]
+    },
+    "z_next+a": {
+      "mean": 0.5197183977763575,
+      "std": 0.007882790823082651,
+      "per_seed": [
+        0.5297220019450517,
+        0.5189772898218181,
+        0.5104559015622028
+      ]
+    },
+    "raw_obs_next+a_diagnostic": 0.39362618408079536,
     "margin": 0.125,
+    "probe_noise_floor": 0.023969310213786753,
+    "gap": -0.18335279427432866,
     "consequence_reached_latent": true
   },
   "linear_probe_r2": {
@@ -180,10 +163,10 @@
     "ensemble": false
   },
   "verdict": {
-    "label": "VOID",
+    "label": "VOID-FIDELITY",
     "interpret_table": false,
     "reasons": [
-      "GATE A failed: output observation still does not carry q-double-dot (pooled R2=0.33, physics_shift R2=0.34, floor 0.6). Detector table NOT interpreted."
+      "GATE A failed on WINDOW-scale q-double-dot (pooled R2=0.41, physics_shift R2=0.42, floor 0.6): even window-scale acceleration is not recoverable from the observation. A render/window-fidelity change is justified (NOT performed in this task). Detector table NOT interpreted."
     ]
   }
 }

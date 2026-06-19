@@ -167,6 +167,58 @@ honestly with the gate that proves it. Recommended next step (a further rig chan
 here): align the `q̈` target to the window scale (or raise render resolution / shrink stride with a
 larger image) so the consequence clears the 0.60 bar, then re-read `c_z`.
 
+## LW-10 — window-scale q̈ gate (two new commits after eecf41a)
+
+**Why the target was corrected.** LW-09 gated on the **instantaneous** `q̈ = (q̇_{t+dt} − q̇_t)/dt`
+at native `dt = 0.01 s`. But `obs_next` is a rendered window spanning `frame_stride·dt = 0.08 s`; a
+multi-frame observation can carry **window-scale** average acceleration, not necessarily the
+single-native-`dt` derivative. The LW-09 gate target was mis-specified relative to what the
+observation represents. This is a measurement-definition correction, not a threshold change — the
+0.60 bar is unchanged. (Committed `8cf3c58` *before* rerunning, with no detector reinterpretation.)
+
+**Corrected target (primary):** `qdd_window = (q̇_{t+S·dt} − q̇_t)/(S·dt)`, `S = frame_stride`.
+Diagnostics kept: `qdd_instant = (q̇_{t+dt} − q̇_t)/dt`, pose-curvature
+`(q_{t+2S·dt} − 2q_{t+S·dt} + q_t)/(S·dt)²`.
+
+**q̈ recoverability (nonlinear R², clean):**
+
+| predictor | window (primary) | instant (diag) | pose-curv (diag) |
+|---|---:|---:|---:|
+| obs_next + a | 0.394 | 0.318 | 0.456 |
+| z_next + a | 0.530 | 0.383 | 0.524 |
+| obs_next | 0.370 | — | — |
+| z_next | 0.442 | — | — |
+
+The correction **helped** (window > instant everywhere: z_next+a 0.530 vs 0.383), confirming the
+timescale mismatch was real — but did not lift the raw-observation probe to the bar.
+
+**Capacity-matched comparison (PCA→12d on clean-training obs_next, same probe as z_next, 3 seeds):**
+
+| predictor | mean | std | per-seed |
+|---|---:|---:|---|
+| obs_next + a (PCA-12) | 0.336 | 0.016 | 0.319 / 0.358 / 0.333 |
+| z_next + a | 0.520 | 0.008 | 0.530 / 0.519 / 0.510 |
+
+gap = −0.183, margin 0.125, probe-noise floor 0.024 → **consequence_reached_latent = True** (z is
+*richer* than a 12-d linear projection of the pixels, as expected for a nonlinear AE).
+
+**GATE A (raw `obs_next+a → qdd_window` > 0.60):** clean 0.394 / physics_shift 0.422 / pooled 0.408
+→ **FAIL**. **GATE B (no input leak):** AUROC d_z/u_z = 0.500/0.500, matched-pair Δ = 0.0 → **PASS**.
+**RECON (output window):** 4.0× over baseline, shift/clean ratio 0.99 → **PASS**.
+
+**FINAL LABEL: VOID-FIDELITY** — even *window-scale* acceleration is not recoverable from the
+observation to the 0.60 bar (raw obs_next+a ≈ 0.41). Per the pre-registered rule the detector table
+is **NOT interpreted** (saved for record only); the 0.60 bar was not softened. A render/window
+fidelity change is **justified but explicitly not performed in this task** (forbidden: no resolution
+/ AE / window-span change).
+
+**Honest caveat surfaced by this run:** the *latent* already carries window-scale q̈ at ≈0.52
+(z_next+a 0.530; capacity-matched z 0.520 ≫ PCA-obs 0.336), i.e. the consequence demonstrably
+reaches z. The binding failure is the **observation-side gate**: the 24×24 render + a coarse
+0.08 s window do not let even a fair probe pull window-scale q̈ from the *pixels* up to 0.60. So the
+next move is observation fidelity (higher resolution or a q̈-scale window), after which `c_z` can
+finally be read. Not done here by task constraint.
+
 ## Notes / open threads
 
 - Seeds fixed; full run ~1.5–2 min on CPU. `--quick` for smoke.
