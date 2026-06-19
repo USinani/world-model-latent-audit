@@ -141,6 +141,44 @@ def _qdd_probe(Xtr, qdd_tr, evals, seed=7):
     return out
 
 
+# LW-10: probe-parity seeds for the capacity-matched obs_next vs z_next comparison.
+PROBE_SEEDS = (7, 17, 27)
+
+
+def _velocity_after(arm, q, qd, a, n_steps, dt):
+    """Velocity after integrating n_steps native-dt RK4 sub-steps under `arm` (ZOH a).
+    Reuses the exact batched integrator that builds the window (windows.rk4_batch), so
+    the qdd targets sit on the same dynamics as the rendered poses."""
+    Q, QD = np.asarray(q, float).copy(), np.asarray(qd, float).copy()
+    a = np.asarray(a, float)
+    for _ in range(int(n_steps)):
+        Q, QD = windows.rk4_batch(arm, Q, QD, a, dt)
+    return QD
+
+
+def _pca_fit(X, k):
+    """PCA on X (rows=samples), keep k components. Returns (mean, components (k,D))."""
+    mu = X.mean(0)
+    with np.errstate(over="ignore", invalid="ignore", divide="ignore"):
+        _, _, Vt = np.linalg.svd(X - mu, full_matrices=False)
+    return mu, Vt[:k]
+
+
+def _pca_transform(X, mu, comps):
+    with np.errstate(over="ignore", invalid="ignore", divide="ignore"):
+        return (X - mu) @ comps.T
+
+
+def _multiseed_r2(Xtr, ytr, Xte, yte, seeds=PROBE_SEEDS):
+    """Capacity-matched probe repeated over seeds; returns mean/std/per_seed of R^2."""
+    vals = []
+    for s in seeds:
+        probe, sm, ss = _nl_fit(Xtr, ytr, seed=s)
+        vals.append(float(np.mean(_nl_eval(probe, sm, ss, Xte, yte))))
+    return {"mean": float(np.mean(vals)), "std": float(np.std(vals)),
+            "per_seed": [float(v) for v in vals]}
+
+
 # --------------------------------------------------------------------------
 # main
 # --------------------------------------------------------------------------
@@ -172,7 +210,8 @@ def run(cfg: Config):
     # ---- train AE on CLEAN (nominal) windows: pool real obs_t and obs_next ----
     ae_rng = np.random.default_rng(cfg.seed + 21)
     F_obs_t_tr = back(nom, train_ae, ae_rng)
-    F_obs_next_tr, qd_next_ae = fwd(nom, train_ae, ae_rng)
+    poses_next_ae, qd_next_ae = windows.forward_window(nom, train_ae[:, 0:2], train_ae[:, 2:4], train_ae[:, 4:6], cfg)
+    F_obs_next_tr = render.render_window(poses_next_ae, cfg, ae_rng)
     F_tr = np.vstack([F_obs_t_tr, F_obs_next_tr])
     ae = LatentAE(cfg, F_tr.shape[1], seed=cfg.seed).fit(F_tr)
 
@@ -201,13 +240,19 @@ def run(cfg: Config):
     rows_ex = _cap(np.vstack([wide_rollout(nom, cfg, rng) for _ in range(n_wide)]), cfg.seed + 8)
     rows_id = _cap(np.vstack([rollout(nom, cfg, rng) for _ in range(max(6, cfg.n_test_id // 2))]), cfg.seed + 9)
 
+    S_stride = int(cfg.frame_stride)
+
     def build_pack(rows, fwd_arm, true_arm, obs_t, seed):
         rr = np.random.default_rng(seed)
         poses, qd_next = windows.forward_window(fwd_arm, rows[:, 0:2], rows[:, 2:4], rows[:, 4:6], cfg)
         obs_next = render.render_window(poses, cfg, rr)               # jittered observed
         obs_next_true = render.render_window(poses, cfg, rr, jitter=0.0)  # privileged non-jittered
+        # qd_window = velocity after the FIRST rendered frame interval (S native dt steps),
+        # under the SAME regime physics that rolls the output window -> window-scale qdd target.
+        qd_window = _velocity_after(fwd_arm, rows[:, 0:2], rows[:, 2:4], rows[:, 4:6], S_stride, cfg.dt)
         return dict(q=rows[:, 0:2], qd=rows[:, 2:4], a=rows[:, 4:6], true_arm=true_arm,
-                    obs_t=obs_t, obs_next=obs_next, obs_next_true=obs_next_true, qd_next=qd_next)
+                    obs_t=obs_t, obs_next=obs_next, obs_next_true=obs_next_true,
+                    qd_next=qd_next, qd_window=qd_window, poses=poses)
 
     # order matches v3 table: clean / extrapolation / physics_shift / id_holdout
     packs = {}
@@ -282,46 +327,87 @@ def run(cfg: Config):
               "max_abs_delta_dz": delta_dz, "max_abs_delta_uz": delta_uz,
               "PASS": bool(band[0] <= auroc_dz <= band[1] and band[0] <= auroc_uz <= band[1])}
 
-    # ---- GATE A + AE-capacity: q-double-dot recoverability ----
-    qdd_ae = (qd_next_ae - train_ae[:, 2:4]) / dt                     # nominal training target
+    # ---- GATE A (LW-10: WINDOW-scale qdd) + diagnostics + capacity-matched AE check ----
+    # obs_next is a rendered window spanning frame_stride*dt, so the gate target is the
+    # WINDOW-scale average acceleration over the first rendered frame interval, aligned to
+    # the observation timescale -- NOT the native single-dt derivative (which the coarse
+    # window cannot represent). Instantaneous qdd and pose-curvature are kept as diagnostics.
+    S_dt = S_stride * dt
     a_ae = train_ae[:, 4:6]
     z_obs_next_tr = ae.encode(F_obs_next_tr)
     z_obs_t_tr = ae.encode(F_obs_t_tr)
     Pc, Ph = packs["clean"], packs["physics_shift"]
-    qdd_clean = (Pc["qd_next"] - Pc["qd"]) / dt
-    qdd_shift = (Ph["qd_next"] - Ph["qd"]) / dt
+
+    # training targets (clean / nominal)
+    qd_window_ae = _velocity_after(nom, train_ae[:, 0:2], train_ae[:, 2:4], a_ae, S_stride, dt)
+    qddw_ae = (qd_window_ae - train_ae[:, 2:4]) / S_dt                       # PRIMARY: window-scale
+    qddi_ae = (qd_next_ae - train_ae[:, 2:4]) / dt                          # diagnostic: instantaneous
+    qddc_ae = (poses_next_ae[:, 2] - 2 * poses_next_ae[:, 1] + poses_next_ae[:, 0]) / (S_dt ** 2)  # pose-curv
+
+    def qddw(P): return (P["qd_window"] - P["qd"]) / S_dt
+    def qddi(P): return (P["qd_next"] - P["qd"]) / dt
+    def qddc(P): return (P["poses"][:, 2] - 2 * P["poses"][:, 1] + P["poses"][:, 0]) / (S_dt ** 2)
 
     def H(*xs): return np.hstack(xs)
-    # obs_next + a : the GATE A predictor (clean / physics_shift / pooled)
-    on = _qdd_probe(H(F_obs_next_tr, a_ae), qdd_ae, {
-        "clean":         (H(Pc["obs_next"], Pc["a"]), qdd_clean),
-        "physics_shift": (H(Ph["obs_next"], Ph["a"]), qdd_shift),
-        "pooled":        (np.vstack([H(Pc["obs_next"], Pc["a"]), H(Ph["obs_next"], Ph["a"])]),
-                          np.vstack([qdd_clean, qdd_shift])),
-    })
-    accel = {"recover_floor": GATE_A_QDD, "obs_next+a": on}
-    # remaining predictors, evaluated on clean (canonical recoverability)
-    for nm, Xtr, Xte in [
-        ("z_next+a", H(z_obs_next_tr, a_ae), H(Pc["z_next"], Pc["a"])),
-        ("obs_next", F_obs_next_tr,          Pc["obs_next"]),
-        ("z_next",   z_obs_next_tr,          Pc["z_next"]),
-        ("obs_t+a",  H(F_obs_t_tr, a_ae),    H(Pc["obs_t"], Pc["a"])),
-        ("z_t+a",    H(z_obs_t_tr, a_ae),    H(Pc["z_t"], Pc["a"])),
-    ]:
-        accel[nm] = _qdd_probe(Xtr, qdd_ae, {"clean": (Xte, qdd_clean)})["clean"]
 
-    r2_obs_next_a = on["clean"]["nonlinear_mean"]
-    r2_z_next_a = accel["z_next+a"]["nonlinear_mean"]
-    gate_a = {"floor": GATE_A_QDD,
-              "clean": on["clean"]["nonlinear_mean"],
-              "physics_shift": on["physics_shift"]["nonlinear_mean"],
-              "pooled": on["pooled"]["nonlinear_mean"],
-              "obs_t_plus_a_diagnostic_clean": accel["obs_t+a"]["nonlinear_mean"]}
+    def r2c(Xtr, ytr, Xte, yte):
+        return _qdd_probe(Xtr, ytr, {"clean": (Xte, yte)})["clean"]["nonlinear_mean"]
+
+    # --- GATE A predictor: raw obs_next + a -> qdd_window  (clean / physics_shift / pooled) ---
+    on_w = _qdd_probe(H(F_obs_next_tr, a_ae), qddw_ae, {
+        "clean":         (H(Pc["obs_next"], Pc["a"]), qddw(Pc)),
+        "physics_shift": (H(Ph["obs_next"], Ph["a"]), qddw(Ph)),
+        "pooled":        (np.vstack([H(Pc["obs_next"], Pc["a"]), H(Ph["obs_next"], Ph["a"])]),
+                          np.vstack([qddw(Pc), qddw(Ph)])),
+    })
+    gate_a = {"floor": GATE_A_QDD, "target": "qdd_window = (qd_{t+S*dt} - qd_t)/(S*dt)",
+              "clean": on_w["clean"]["nonlinear_mean"],
+              "physics_shift": on_w["physics_shift"]["nonlinear_mean"],
+              "pooled": on_w["pooled"]["nonlinear_mean"]}
     gate_a["PASS"] = bool(gate_a["pooled"] > GATE_A_QDD and gate_a["physics_shift"] > GATE_A_QDD)
 
-    capacity = {"obs_next+a_clean": r2_obs_next_a, "z_next+a_clean": r2_z_next_a,
-                "margin": AE_LIMIT_MARGIN,
-                "consequence_reached_latent": bool(r2_z_next_a >= r2_obs_next_a - AE_LIMIT_MARGIN)}
+    # --- recoverability tables on clean (single-seed, for the record) ---
+    window_tbl = {
+        "obs_next+a": gate_a["clean"],
+        "z_next+a":   r2c(H(z_obs_next_tr, a_ae), qddw_ae, H(Pc["z_next"], Pc["a"]), qddw(Pc)),
+        "obs_next":   r2c(F_obs_next_tr,          qddw_ae, Pc["obs_next"],           qddw(Pc)),
+        "z_next":     r2c(z_obs_next_tr,          qddw_ae, Pc["z_next"],             qddw(Pc)),
+    }
+    instant_tbl = {  # diagnostic (native single-dt derivative; what LW-09 gated on)
+        "obs_next+a": r2c(H(F_obs_next_tr, a_ae), qddi_ae, H(Pc["obs_next"], Pc["a"]), qddi(Pc)),
+        "z_next+a":   r2c(H(z_obs_next_tr, a_ae), qddi_ae, H(Pc["z_next"], Pc["a"]), qddi(Pc)),
+    }
+    posecurv_tbl = {  # diagnostic (second pose difference over the window)
+        "obs_next+a": r2c(H(F_obs_next_tr, a_ae), qddc_ae, H(Pc["obs_next"], Pc["a"]), qddc(Pc)),
+        "z_next+a":   r2c(H(z_obs_next_tr, a_ae), qddc_ae, H(Pc["z_next"], Pc["a"]), qddc(Pc)),
+    }
+
+    # --- capacity-matched comparison for AE-LIMIT vs DEEP RED (probe parity) ---
+    # PCA on CLEAN-TRAINING obs_next only -> ~latent_dim, then the SAME nonlinear probe as
+    # z_next; both repeated over 3 seeds (mean/std). The AE-LIMIT/DEEP RED decision uses THIS
+    # capacity-matched comparison, never the raw high-dim obs_next probe (which underestimates).
+    k = int(cfg.latent_dim)
+    pca_mu, pca_comps = _pca_fit(F_obs_next_tr, k)
+    obs_pca_tr = _pca_transform(F_obs_next_tr, pca_mu, pca_comps)
+    obs_pca_te = _pca_transform(Pc["obs_next"], pca_mu, pca_comps)
+    capm_obs = _multiseed_r2(H(obs_pca_tr, a_ae), qddw_ae, H(obs_pca_te, Pc["a"]), qddw(Pc))
+    capm_z   = _multiseed_r2(H(z_obs_next_tr, a_ae), qddw_ae, H(Pc["z_next"], Pc["a"]), qddw(Pc))
+    noise_floor = float(capm_obs["std"] + capm_z["std"])
+    gap = float(capm_obs["mean"] - capm_z["mean"])
+    # consequence reached the latent iff z_next is NOT meaningfully worse than capacity-matched
+    # obs_next (within the AE margin OR within probe noise).
+    reached = bool(gap <= AE_LIMIT_MARGIN or gap <= noise_floor)
+
+    accel = {"recover_floor": GATE_A_QDD, "S_dt": float(S_dt),
+             "qdd_window": window_tbl, "qdd_instant_diagnostic": instant_tbl,
+             "qdd_pose_curv_diagnostic": posecurv_tbl,
+             "gate_a_per_regime": {kk: on_w[kk]["nonlinear_mean"]
+                                   for kk in ("clean", "physics_shift", "pooled")}}
+    capacity = {"target": "qdd_window", "pca_components": k,
+                "capacity_matched_obs_next+a": capm_obs, "z_next+a": capm_z,
+                "raw_obs_next+a_diagnostic": window_tbl["obs_next+a"],
+                "margin": AE_LIMIT_MARGIN, "probe_noise_floor": noise_floor, "gap": gap,
+                "consequence_reached_latent": reached}
 
     # ---- laundering / vacuity probe on z_t (q, qd) ----
     z_probe_tr = z_obs_t_tr; s_probe_tr = train_ae[:, 0:4]
@@ -385,28 +471,33 @@ def run(cfg: Config):
 
 def _final_label(recon_gate, gate_a, gate_b, capacity, table,
                  r2_lin, r2_nl, rho_cz_r, rho_cz_dz):
-    """The pre-registered 4-way rule. Gates first (VOID + stop); then AE-capacity
-    (AE-LIMIT); only with the consequence demonstrably in the latent do we read c_z."""
-    # --- VOID conditions: rig invalid / unreadable ---
+    """LW-10 label rule. Gate B (leak) and Gate A (window-scale qdd fidelity) are
+    interpretation gates; only when both pass AND the consequence demonstrably reached
+    the latent (capacity-matched comparison, with probe noise) do we read c_z."""
+    # --- rig-validity / unreadable conditions ---
     if not recon_gate["PASS"]:
         return {"label": "VOID", "interpret_table": False,
                 "reasons": ["recon gate failed (AE did not beat baseline, or physics_shift "
                             "output recon degraded, or training failed) — a training failure "
                             "must not masquerade as a scientific boundary."]}
-    if not gate_a["PASS"]:
-        return {"label": "VOID", "interpret_table": False,
-                "reasons": [f"GATE A failed: output observation still does not carry q-double-dot "
-                            f"(pooled R2={gate_a['pooled']:.2f}, physics_shift R2={gate_a['physics_shift']:.2f}, "
-                            f"floor {gate_a['floor']}). Detector table NOT interpreted."]}
     if not gate_b["PASS"]:
-        return {"label": "VOID", "interpret_table": False,
+        return {"label": "LEAK-INVALID / VOID", "interpret_table": False,
                 "reasons": [f"GATE B failed: hidden physics leaked into obs_t "
                             f"(AUROC d_z={gate_b['auroc_dz']:.2f}, u_z={gate_b['auroc_uz']:.2f} "
                             f"outside {gate_b['band']}). Detector table NOT interpreted."]}
+    if not gate_a["PASS"]:
+        return {"label": "VOID-FIDELITY", "interpret_table": False,
+                "reasons": [f"GATE A failed on WINDOW-scale q-double-dot (pooled R2={gate_a['pooled']:.2f}, "
+                            f"physics_shift R2={gate_a['physics_shift']:.2f}, floor {gate_a['floor']}): even "
+                            "window-scale acceleration is not recoverable from the observation. A "
+                            "render/window-fidelity change is justified (NOT performed in this task). "
+                            "Detector table NOT interpreted."]}
 
-    # --- both gates pass: the result is readable ---
+    # --- both interpretation gates pass: read the result ---
     reached = capacity["consequence_reached_latent"]
-    r2o, r2z = capacity["obs_next+a_clean"], capacity["z_next+a_clean"]
+    r2o = capacity["capacity_matched_obs_next+a"]["mean"]
+    r2z = capacity["z_next+a"]["mean"]
+    nf = capacity["probe_noise_floor"]; gap = capacity["gap"]
     ps_cz = table["physics_shift"]["c_z"]
     cz_catches = (ps_cz is not None) and ps_cz < 0.5
     laundered = r2_lin > R2_CEIL
@@ -415,6 +506,8 @@ def _final_label(recon_gate, gate_a, gate_b, capacity, table,
     common = {"interpret_table": True,
               "gate_a_pass": True, "gate_b_pass": True,
               "consequence_reached_latent": bool(reached),
+              "capacity_matched_obs_R2": r2o, "z_next_R2": r2z,
+              "gap": gap, "probe_noise_floor": nf,
               "cz_catches_physics_shift": bool(cz_catches),
               "cz_tracks_r_spearman": rho_cz_r,
               "cz_vs_dz_spearman": rho_cz_dz,
@@ -423,25 +516,26 @@ def _final_label(recon_gate, gate_a, gate_b, capacity, table,
 
     if not reached:
         return {"label": "AE-LIMIT",
-                "reasons": [f"q-double-dot reaches the frames (obs_next+a R2={r2o:.2f}) but NOT the "
-                            f"latent (z_next+a R2={r2z:.2f}, gap > {AE_LIMIT_MARGIN}): the AE bottleneck "
-                            "discarded the acceleration. c_z cannot be blamed for a consequence the "
-                            "encoder threw away. Fix = widen latent_dim, rerun."],
+                "reasons": [f"window-scale q-double-dot reaches the (capacity-matched) frames "
+                            f"R2={r2o:.2f} but NOT the latent (z_next+a R2={r2z:.2f}, gap={gap:.2f} > "
+                            f"max(margin {AE_LIMIT_MARGIN}, noise {nf:.2f})): the AE bottleneck discarded "
+                            "the acceleration. c_z cannot be blamed for a consequence the encoder threw "
+                            "away. Fix = widen latent_dim, rerun."],
                 **common}
     if cz_catches:
         return {"label": "GREEN",
-                "reasons": [f"consequence reached the latent (z_next+a R2={r2z:.2f} ~ obs_next+a "
-                            f"R2={r2o:.2f}) AND c_z catches physics_shift "
-                            f"({table['physics_shift']['c_z']:.0%} missed): learned transition "
-                            "consistency recovers the analytic residual's role once the observation "
-                            "carries the consequence."],
+                "reasons": [f"consequence reached the latent (z_next+a R2={r2z:.2f} ~ capacity-matched "
+                            f"obs_next+a R2={r2o:.2f}, gap={gap:.2f}) AND c_z catches physics_shift "
+                            f"({table['physics_shift']['c_z']:.0%} missed): learned transition consistency "
+                            "recovers the analytic residual's role once the observation carries the "
+                            "consequence."],
                 **common}
     return {"label": "DEEP RED",
-            "reasons": [f"consequence reached the latent (z_next+a R2={r2z:.2f} ~ obs_next+a "
-                        f"R2={r2o:.2f}) yet c_z still MISSES physics_shift "
-                        f"({table['physics_shift']['c_z']:.0%} missed): learned transition "
-                        "consistency fails despite the consequence being accessible in z — "
-                        "auditability needs privileged structure, not just a learned latent."],
+            "reasons": [f"consequence reached the latent (z_next+a R2={r2z:.2f} ~ capacity-matched "
+                        f"obs_next+a R2={r2o:.2f}, gap={gap:.2f}) yet c_z still MISSES physics_shift "
+                        f"({table['physics_shift']['c_z']:.0%} missed): learned transition consistency "
+                        "fails despite the consequence being accessible in z — auditability needs "
+                        "privileged structure, not just a learned latent."],
             **common}
 
 
@@ -452,42 +546,46 @@ def _print(o):
     cols = ["u_z", "d_z", "c_z", "PORTFOLIO"]
     v = o["verdict"]
     ga, gb = o["gate_a"], o["gate_b"]
+    ac = o["accel_recoverability"]; cap = o["ae_capacity"]
     print("\n" + "=" * 78)
-    print("LW-09 LATENT FAILURE-MODE (curvature output window + pre-registered gates)")
+    print("LW-10 LATENT FAILURE-MODE (window-scale q-double-dot gate)")
     print("=" * 78)
 
-    print("\nGATE A — output observation carries q-double-dot  (hard gate: pooled & physics_shift > "
-          f"{ga['floor']}):")
-    print(f"  nonlinear R2(obs_next+a -> qdd):  clean={ga['clean']:.3f}  "
+    print(f"\nGATE A — obs carries WINDOW-scale q-double-dot  (hard gate: pooled & physics_shift > {ga['floor']})")
+    print(f"  target: {ga['target']}")
+    print(f"  nonlinear R2(obs_next+a -> qdd_window):  clean={ga['clean']:.3f}  "
           f"physics_shift={ga['physics_shift']:.3f}  pooled={ga['pooled']:.3f}")
-    print(f"  (diagnostic) obs_t+a -> qdd clean={ga['obs_t_plus_a_diagnostic_clean']:.3f}  "
-          f"=> GATE A {'PASS' if ga['PASS'] else 'FAIL (VOID)'}")
+    print(f"  => GATE A {'PASS' if ga['PASS'] else 'FAIL (VOID-FIDELITY)'}")
 
-    print("\nGATE B — no hidden physics leaked into obs_t  (AUROC clean vs physics_shift in "
-          f"{gb['band']}):")
+    print(f"\nGATE B — no hidden physics leaked into obs_t  (AUROC clean vs physics_shift in {gb['band']})")
     print(f"  AUROC d_z={gb['auroc_dz']:.3f}  u_z={gb['auroc_uz']:.3f}  "
           f"max|delta| d_z={gb['max_abs_delta_dz']:.2e} u_z={gb['max_abs_delta_uz']:.2e}  "
-          f"=> GATE B {'PASS' if gb['PASS'] else 'FAIL (VOID)'}")
+          f"=> GATE B {'PASS' if gb['PASS'] else 'FAIL (LEAK-INVALID)'}")
 
     rg = o["recon_gate"]
-    print("\nRECON GATE (on output window):")
-    print(f"  AE recon (clean)={rg['ae_recon_clean']:.5f}  mean-frame baseline={rg['mean_frame_baseline']:.5f}"
-          f"  beats(>= {rg['beat_factor_required']}x)={rg['beats_baseline']}")
-    print(f"  recon physics_shift={rg['recon_physics_shift']:.5f}  ratio={rg['shift_ratio']:.2f}"
-          f" (<= {rg['shift_ratio_max']})={rg['shift_comparable']}  => GATE {'PASS' if rg['PASS'] else 'FAIL (VOID)'}")
+    print("\nRECON GATE (output window):")
+    print(f"  recon clean={rg['ae_recon_clean']:.5f} vs baseline={rg['mean_frame_baseline']:.5f} "
+          f"beats(>= {rg['beat_factor_required']}x)={rg['beats_baseline']}; "
+          f"shift ratio={rg['shift_ratio']:.2f} (<= {rg['shift_ratio_max']})={rg['shift_comparable']} "
+          f"=> {'PASS' if rg['PASS'] else 'FAIL (VOID)'}")
 
-    ac = o["accel_recoverability"]; cap = o["ae_capacity"]
-    print("\nq-double-dot RECOVERABILITY  R^2(. -> realized qdd)  (clean unless noted):")
-    on = ac["obs_next+a"]
-    print(f"  obs_next+a   clean={on['clean']['nonlinear_mean']:.3f}  "
-          f"physics_shift={on['physics_shift']['nonlinear_mean']:.3f}  pooled={on['pooled']['nonlinear_mean']:.3f}")
-    for nm in ("z_next+a", "obs_next", "z_next", "obs_t+a", "z_t+a"):
-        print(f"  {nm:11s} clean={ac[nm]['nonlinear_mean']:.3f}")
-    print(f"  AE-capacity: z_next+a={cap['z_next+a_clean']:.3f} vs obs_next+a={cap['obs_next+a_clean']:.3f} "
-          f"(margin {cap['margin']}) -> consequence_reached_latent={cap['consequence_reached_latent']}")
+    w = ac["qdd_window"]; di = ac["qdd_instant_diagnostic"]; dc = ac["qdd_pose_curv_diagnostic"]
+    print("\nq-double-dot RECOVERABILITY  R^2(. -> target)  (clean):")
+    print(f"  [WINDOW ]  obs_next+a={w['obs_next+a']:.3f}  z_next+a={w['z_next+a']:.3f}  "
+          f"obs_next={w['obs_next']:.3f}  z_next={w['z_next']:.3f}")
+    print(f"  [instant]  obs_next+a={di['obs_next+a']:.3f}  z_next+a={di['z_next+a']:.3f}   (diagnostic)")
+    print(f"  [posecrv]  obs_next+a={dc['obs_next+a']:.3f}  z_next+a={dc['z_next+a']:.3f}   (diagnostic)")
 
+    co = cap["capacity_matched_obs_next+a"]; cz = cap["z_next+a"]
+    print(f"\nCAPACITY-MATCHED (PCA->{cap['pca_components']}d) 3-seed qdd_window  [AE-LIMIT vs DEEP RED basis]:")
+    print(f"  obs_next+a  mean={co['mean']:.3f} std={co['std']:.3f} per_seed={[round(x,3) for x in co['per_seed']]}")
+    print(f"  z_next+a    mean={cz['mean']:.3f} std={cz['std']:.3f} per_seed={[round(x,3) for x in cz['per_seed']]}")
+    print(f"  gap={cap['gap']:.3f}  margin={cap['margin']}  noise_floor={cap['probe_noise_floor']:.3f} "
+          f"-> consequence_reached_latent={cap['consequence_reached_latent']}")
+
+    interp = v.get("interpret_table", True)
     print("\nDETECTOR TABLE — missed-catastrophe (lower=safer), 5% total FA"
-          + ("" if v.get("interpret_table", True) else "   [NOT INTERPRETED: gates failed]"))
+          + ("" if interp else "   [NOT INTERPRETED: gates failed]"))
     print(f"{'regime':14s} {'#cat':>5s} " + " ".join(f"{c:>10s}" for c in cols))
     for reg, row in o["missed_catastrophe"].items():
         print(f"{reg:14s} {row['n_cata']:5d} " + " ".join(f"{_fmt(row[c]):>10s}" for c in cols))
@@ -523,7 +621,7 @@ def _save(cfg, o, S, eps_thr):
         for j in range(len(cols)):
             val = M[i, j]
             ax.text(j, i, "n/a" if np.isnan(val) else f"{val:.0%}", ha="center", va="center", fontsize=10)
-    ax.set_title(f"LW-09 latent missed-catastrophe (green=safe). FINAL LABEL: {o['verdict']['label']}")
+    ax.set_title(f"LW-10 latent missed-catastrophe (green=safe). FINAL LABEL: {o['verdict']['label']}")
     fig.colorbar(im, label="fraction missed"); fig.tight_layout()
     fig.savefig(d / "latent_missed_catastrophe.png", dpi=130); plt.close(fig)
 
