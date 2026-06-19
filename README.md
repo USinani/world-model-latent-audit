@@ -151,3 +151,10 @@ observation/window family (48×48 grayscale; frame interval 0.08s / `frame_strid
 variable to change is the **representation objective** (a predictive / JEPA-style / audit-preserving
 latent objective instead of reconstruction) — that **changes the question** and requires a new
 charter; it is out of scope for latent v0. See `FINDINGS_latent_v0.md` for the full closeout.
+
+**Addendum (raw-observation consequence ceiling):** an AE-free diagnostic shows the matched
+consequence delta *was* recoverable from the rendered observation at the **matched 12-D capacity**
+(`R²(Δraw_obs_next → Δqdd_window) = 0.716` vs latent `−0.175`; oracle on true pose 0.992) — so the
+binding limit sits in this reconstruction-trained AE stack, not in the observation. Pre-registered
+Branch C; formal label still `VOID-FIDELITY`; no detector table interpreted. Details in
+`FINDINGS_latent_v0.md`.

@@ -296,6 +296,14 @@ variable to change is the **representation objective** (predictive / JEPA-style 
 latent objective instead of reconstruction); that changes the question and needs a new charter. Full
 closeout in `FINDINGS_latent_v0.md`.
 
+**Addendum (raw-observation consequence ceiling).** A later AE-free diagnostic (not a new gate/phase;
+no detector table read) recovers the matched consequence delta from the rendered observation at the
+matched 12-D capacity (`R²(Δraw_obs_next → Δqdd_window) = 0.716` vs latent `−0.175`; oracle on true
+pose 0.992; analytic Δqdd_window total var 140.1). Pre-registered Branch C: the observation carried
+the consequence; this reconstruction-trained AE stack at this capacity failed to preserve it in `z`
+(strengthens the representation-objective hypothesis, not a general reconstruction claim). Formal label
+unchanged (`VOID-FIDELITY`). See `FINDINGS_latent_v0.md` (Addendum).
+
 ## Notes / open threads
 
 - Seeds fixed; full run ~1.5–2 min at 24px, ~7 min at 48px on CPU. `--quick` for smoke.

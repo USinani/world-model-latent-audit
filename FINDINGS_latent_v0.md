@@ -71,3 +71,54 @@ The next variable to change is the **representation objective**: a predictive / 
 audit-preserving latent objective instead of reconstruction, so the latent is trained to keep the
 transition consequence rather than only to reconstruct frames. This is out of scope for latent v0 and
 requires a new charter — it changes the question, not just the rig.
+
+## Addendum: raw-observation consequence ceiling
+
+**Purpose.** One isolated diagnostic to settle the remaining causal ambiguity in the
+`VOID-FIDELITY / consequence-not-encoded` reading: *was the matched hidden-mass consequence delta
+present and recoverable in the rendered observations before the reconstruction-trained AE stack failed
+to preserve it, or was it absent/unresolved before the AE ever saw it?* This is **not** a new gate and
+**not** a new experiment phase; **no detector table was interpreted**; the formal LW-11 label remains
+**`VOID-FIDELITY`**. No AE/dynamics retraining (the probe is AE-free).
+
+**Method.** Target-aligned (not raw pixel MSE): the capacity-matched raw-observation consequence probe
+`R²(Δraw_obs_next → Δqdd_window)`, where `Δraw_obs_next = raw_obs_next_heavy − raw_obs_next_clean` and
+`Δqdd_window = qdd_window_heavy − qdd_window_clean`, on the **same** matched clean/heavy pairs and
+**paired-nuisance** convention as the LW-11 delta gate, using the full flattened `obs_next` stack
+reduced to `latent_dim=12` by PCA and the same 3-seed nonlinear probe. The reconstruction was anchored
+by reproducing the committed LW-11 capacity-matched obs probe: **0.349** (committed 0.345; per-seed
+0.372/0.395/0.282 vs 0.373/0.397/0.266) — faithful.
+
+**Results (48×48; `frame_stride=8`; PCA→12; seeds 7/17/27):**
+
+| quantity | value |
+|---|---|
+| **Primary: `R²(Δraw_obs_next → Δqdd_window)` PCA-12** | **mean 0.716** (std 0.007; per-seed 0.706 / 0.718 / 0.722) |
+| Latent delta (committed LW-11) for comparison | mean −0.175 (per-seed −0.152 / −0.185 / −0.187) |
+| `pixel_minus_latent_gap` | **0.891** |
+| `pca12_explained_variance_ratio_sum(Δraw_obs_next)` | 0.327 |
+| Analytic `Δqdd_window` non-degeneracy | mean‖·‖ 9.459; total var 140.10; per-joint var [12.56, 127.53] |
+| Oracle `R²(Δtrue_pose_window → Δqdd_window)` (reference, not a gate) | 0.992 |
+| Diagnostic only (no branch rule): `pixel_delta_r2_pca24` | 0.791 (EVR-24 0.501) |
+| Diagnostic only: curvature-delta `(f₂−2f₁+f₀)` PCA-12 | 0.357 |
+
+The 12-D bottleneck retains only ~33% of the `Δraw_obs_next` variance (EVR-12 = 0.327) yet still
+recovers `Δqdd_window` at R² 0.716 — so at the **matched** observation capacity the consequence lives
+in retained directions; capacity is not the limiter.
+
+**Pre-registered interpretation — Branch C.** The analytic delta is non-degenerate (total var 140.10)
+and recoverable from true kinematics (oracle 0.992); the capacity-matched raw observation carries it
+(`pixel_mean = 0.716 > 0.30`) with `pixel_mean − latent_mean = 0.891 ≥ 0.30`. Therefore:
+
+> The rendered observation made the matched hidden-mass consequence delta recoverable, but this
+> reconstruction-trained AE stack at this capacity failed to preserve it in `z`. This strengthens the
+> representation-objective hypothesis, while still not proving a general claim about reconstruction
+> objectives.
+
+**Wording guard (held).** This is **not** evidence that "reconstruction objectives discard physical
+consequences." The bounded statement is only: *this reconstruction-trained AE stack at this capacity
+failed to preserve an available consequence.* The broader objective claim is what the 2×2 transfer
+matrix exists to test; it is **not** assumed here.
+
+**Status notes.** Formal LW-11 label unchanged (`VOID-FIDELITY`); not a new gate; not a new experiment
+phase; no detector table interpreted. The diagnostic script was temporary and uncommitted.
