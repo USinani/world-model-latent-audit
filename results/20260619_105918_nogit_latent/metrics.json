@@ -1,0 +1,167 @@
+{
+  "eps_thr": 0.5210844803890492,
+  "or_false_alarm": 0.05025,
+  "missed_catastrophe": {
+    "clean": {
+      "n_cata": 400,
+      "u_z": 0.815,
+      "d_z": 0.9575,
+      "c_z": 0.505,
+      "PORTFOLIO": 0.6875
+    },
+    "extrapolation": {
+      "n_cata": 3701,
+      "u_z": 0.28127533099162394,
+      "d_z": 0.4158335584977033,
+      "c_z": 0.20021615779519053,
+      "PORTFOLIO": 0.12266954877060254
+    },
+    "physics_shift": {
+      "n_cata": 393,
+      "u_z": 0.8015267175572519,
+      "d_z": 0.9720101781170484,
+      "c_z": 0.5190839694656488,
+      "PORTFOLIO": 0.6972010178117048
+    },
+    "id_holdout": {
+      "n_cata": 274,
+      "u_z": 0.7226277372262774,
+      "d_z": 0.9197080291970803,
+      "c_z": 0.42700729927007297,
+      "PORTFOLIO": 0.5912408759124088
+    }
+  },
+  "detect_auroc": {
+    "extrapolation": {
+      "u_z": 0.909849140625,
+      "d_z": 0.829227046875,
+      "c_z": 0.79728684375
+    },
+    "physics_shift": {
+      "u_z": 0.499786875,
+      "d_z": 0.49865921875,
+      "c_z": 0.49761878125
+    }
+  },
+  "linear_probe_r2": {
+    "per_target_q1_q2_qd1_qd2": [
+      0.6419697723569622,
+      0.04187032447002026,
+      0.23572302869260653,
+      0.07565859176121692
+    ],
+    "mean": 0.24880542932020147,
+    "band": [
+      0.3,
+      0.9
+    ],
+    "role": "laundering ceiling: R2>0.9 => latent recovered privileged state"
+  },
+  "nonlinear_probe_r2": {
+    "per_target_q1_q2_qd1_qd2": [
+      0.7328478304310231,
+      0.2804867412928259,
+      0.8036152112350274,
+      0.4991980772763416
+    ],
+    "mean": 0.5790369650588045,
+    "role": "vacuity floor: low even here => latent truly discarded state"
+  },
+  "spearman": {
+    "c_z_vs_r": -0.12080119192757958,
+    "c_z_vs_d_z": 0.13013745035384364,
+    "rho_max_for_orthogonal": 0.8
+  },
+  "accel_recoverability": {
+    "frames+a": {
+      "nonlinear_mean": 0.30193215799017714,
+      "nonlinear_per_joint": [
+        0.3324749810939439,
+        0.27138933488641037
+      ],
+      "linear_mean": -0.6680272294113234,
+      "linear_per_joint": [
+        -0.5454565091624048,
+        -0.790597949660242
+      ]
+    },
+    "z+a": {
+      "nonlinear_mean": 0.28411743535014583,
+      "nonlinear_per_joint": [
+        0.2879500549651546,
+        0.2802848157351371
+      ],
+      "linear_mean": 0.0892470080225462,
+      "linear_per_joint": [
+        0.15296506049759673,
+        0.02552895554749568
+      ]
+    },
+    "z": {
+      "nonlinear_mean": 0.3050406953714762,
+      "nonlinear_per_joint": [
+        0.3268577701970331,
+        0.2832236205459193
+      ],
+      "linear_mean": 0.08329782029034044,
+      "linear_per_joint": [
+        0.14332680537875253,
+        0.02326883520192835
+      ]
+    },
+    "frames": {
+      "nonlinear_mean": 0.31237408609754186,
+      "nonlinear_per_joint": [
+        0.34283567436106954,
+        0.2819124978340142
+      ],
+      "linear_mean": -0.7027865485183808,
+      "linear_per_joint": [
+        -0.5810061398851534,
+        -0.8245669571516083
+      ]
+    },
+    "recover_floor": 0.3,
+    "frames_plus_a_mean": 0.30193215799017714,
+    "z_plus_a_mean": 0.28411743535014583,
+    "which_red": "inconclusive_observation_limit",
+    "which_red_note": "qdd is not cleanly recoverable from z+action OR frames+action. The constant-velocity stacked window may not carry enough acceleration signal (curved back-extrapolation would fix it), or the frames probe is underpowered. Rerun before claiming a deep boundary."
+  },
+  "recon_gate": {
+    "ae_recon_clean": 0.004314284734726968,
+    "mean_frame_baseline": 0.0175557915835334,
+    "beat_factor_required": 1.5,
+    "beats_baseline": true,
+    "recon_physics_shift": 0.004306269056642556,
+    "shift_ratio": 0.99814206071796,
+    "shift_ratio_max": 1.5,
+    "shift_comparable": true,
+    "per_regime": {
+      "clean": 0.004314284734726968,
+      "extrapolation": 0.01003884168837856,
+      "physics_shift": 0.004306269056642556,
+      "id_holdout": 0.0043651406862968214
+    },
+    "PASS": true
+  },
+  "training_failed": {
+    "ae": false,
+    "ensemble": false
+  },
+  "verdict": {
+    "label": "RED",
+    "cz_catches_physics_shift": false,
+    "cz_quiet_on_extrapolation": false,
+    "cz_tracks_r": false,
+    "cz_distinct_from_dz": true,
+    "latent_not_laundered": true,
+    "latent_not_vacuous": true,
+    "reasons": [
+      "c_z does not catch physics_shift",
+      "c_z fires on extrapolation (not quiet) -> behaves like a universal error detector; cannot separate novelty from law-violation without privileged state (the boundary result)",
+      "c_z does not track the withheld analytic r (Spearman near 0)",
+      "latent is informative-but-nonlinear (linear R2=0.25 low, nonlinear R2=0.58 high): state is present but not a linear readout -> NOT laundered, NOT vacuous"
+    ],
+    "which_red": "inconclusive_observation_limit"
+  }
+}

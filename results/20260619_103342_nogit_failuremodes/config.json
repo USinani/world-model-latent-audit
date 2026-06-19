@@ -1,0 +1,43 @@
+{
+  "dt": 0.01,
+  "steps": 200,
+  "tau_max": 6.0,
+  "nominal_m": 1.0,
+  "nominal_b": 0.1,
+  "damp_mismatch": 1.0,
+  "n_train": 120,
+  "n_test_id": 40,
+  "n_test_ood": 40,
+  "id_lo": 0.8,
+  "id_hi": 1.2,
+  "ood_lo": 1.6,
+  "ood_hi": 3.0,
+  "k_ensemble": 5,
+  "hidden": [
+    96,
+    96
+  ],
+  "max_iter": 150,
+  "seed": 0,
+  "quick": false,
+  "img_size": 24,
+  "frame_stack": 3,
+  "frame_stride": 8,
+  "link_width": 0.18,
+  "nuisance_jitter": 0.03,
+  "nuisance_texture": 0.08,
+  "fov": 2.3,
+  "latent_dim": 12,
+  "ae_hidden": [
+    192,
+    96
+  ],
+  "dyn_hidden": [
+    96,
+    96
+  ],
+  "ae_max_iter": 250,
+  "dyn_max_iter": 200,
+  "max_ae_frames": 6000,
+  "max_dyn_samples": 6000
+}

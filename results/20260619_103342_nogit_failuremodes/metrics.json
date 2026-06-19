@@ -1,0 +1,73 @@
+{
+  "eps_thr": 1.1994787626198335,
+  "or_false_alarm": 0.05025,
+  "missed_catastrophe": {
+    "clean": {
+      "n_cata": 400,
+      "u": 0.46499999999999997,
+      "d": 0.5475,
+      "r": 0.8225,
+      "PORTFOLIO": 0.5549999999999999
+    },
+    "extrapolation": {
+      "n_cata": 4657,
+      "u": 0.11101567532746404,
+      "d": 0.07429675756925058,
+      "r": 0.5784840025767661,
+      "PORTFOLIO": 0.10264118531243294
+    },
+    "physics_shift": {
+      "n_cata": 449,
+      "u": 0.49443207126948774,
+      "d": 0.5590200445434299,
+      "r": 0.0,
+      "PORTFOLIO": 0.0
+    },
+    "id_holdout": {
+      "n_cata": 202,
+      "u": 0.4653465346534653,
+      "d": 0.4653465346534653,
+      "r": 0.5841584158415842,
+      "PORTFOLIO": 0.3811881188118812
+    }
+  },
+  "detect_auroc": {
+    "extrapolation": {
+      "u": 0.934342625,
+      "d": 0.93785528125,
+      "r": 0.6794631875
+    },
+    "physics_shift": {
+      "u": 0.5,
+      "d": 0.5,
+      "r": 1.0
+    }
+  },
+  "parity": {
+    "tol_abs": 0.08,
+    "cells": {
+      "extrapolation": {
+        "v3_r": 0.5744,
+        "got_r": 0.5784840025767661,
+        "abs_diff": 0.00408400257676611,
+        "within_tol": true
+      },
+      "physics_shift": {
+        "v3_r": 0.0,
+        "got_r": 0.0,
+        "abs_diff": 0.0,
+        "within_tol": true
+      },
+      "id_holdout": {
+        "v3_r": 0.6255,
+        "got_r": 0.5841584158415842,
+        "abs_diff": 0.04134158415841571,
+        "within_tol": true
+      }
+    },
+    "crossover_r_best_on_physics_shift": true,
+    "crossover_ud_best_on_extrapolation": true,
+    "qualitative_pattern_intact": true,
+    "PASS": true
+  }
+}
