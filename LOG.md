@@ -2,6 +2,9 @@
 
 Chronological, gate-by-gate. One log, no control-plane sprawl.
 
+> **Closeout:** latent v0 is terminal at `VOID-FIDELITY` (LW-11). Single-page findings memo:
+> `FINDINGS_latent_v0.md`.
+
 ## M0 — port the validated substrate (numpy-only)
 
 - Sourced the canonical v3 tree from `Archives/` by **content**, not filename: the complete
@@ -280,10 +283,18 @@ single 48px run is the read: no sixth gate, no further in-task fidelity escalati
 set grew. So the LW-10 hope — "the latent already carries window-scale q̈ at ≈0.52, only the pixels
 lag" — does **not** robustly hold once the surface is read on a larger test set at higher resolution
 and the *matched-pair delta* (not the absolute recoverability) is required: the consequence does not
-reliably reach the latent **difference**. This is the terminal verdict of latent v0: with this
-observation/AE/window family, the physics-consequence channel cannot be cleanly read from the learned
-latent, so `c_z` cannot be fairly evaluated against `r`. Any next step (different observation/AE/window
-or an explicitly physics-structured latent) changes the question and needs a new charter.
+reliably reach the latent **difference**. This is the terminal verdict of latent v0
+(`VOID-FIDELITY / consequence-not-encoded`: formal label `VOID-FIDELITY`, with the binding evidence
+the negative matched-pair delta): with this **reconstruction-trained AE** and this observation/window
+family, the physics-consequence channel cannot be cleanly read from the learned latent, so `c_z`
+cannot be fairly evaluated against `r`.
+
+**Scope limit (read before citing).** This is **not** a general claim that learned latents cannot
+support physics auditability — it is a bounded result about this reconstruction-trained AE and this
+observation/window family (48×48 grayscale; frame interval 0.08s / `frame_stride=8`). The next
+variable to change is the **representation objective** (predictive / JEPA-style / audit-preserving
+latent objective instead of reconstruction); that changes the question and needs a new charter. Full
+closeout in `FINDINGS_latent_v0.md`.
 
 ## Notes / open threads
 

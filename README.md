@@ -15,6 +15,10 @@ The full spec is `Latent_Wedge_CHARTER.md` (one page; the single source of truth
 This folder deliberately carries **only** experiment-level discipline (this README
 ledger + `LOG.md` + sanity tests). No program-level control plane is replicated here.
 
+**Terminal result of latent v0:** `VOID-FIDELITY` — a reconstruction-trained AE latent did not
+preserve the hidden-mass consequence delta required for residual-like self-verification. The
+single-page closeout is `FINDINGS_latent_v0.md`.
+
 ## What is reused vs new
 
 Ported **verbatim** from the validated toy-wedge v3 tree (phase-close commit `72866ed`;
@@ -133,12 +137,17 @@ terminal read by constraint (no sixth gate, no further in-task fidelity escalati
 
 ### Boundary paragraph (required output)
 
-The terminal, honest result of latent v0 is that **with this observation / autoencoder / window
-family, the physics-consequence channel cannot be cleanly read from the learned latent** — so a
-learned transition-consistency signal `c_z` cannot be fairly tested for reproducing the analytic
-residual `r`. The minimal fidelity bump (24→48px) did not rescue it, and the matched-pair delta — the
-sharpest fair form of the question, isolating the hidden-mass consequence from render noise — comes
-back **negative**: the consequence does not reach the latent *difference*. The gates did their job:
-they refused to let an unreadable rig masquerade as a GREEN, a DEEP RED, or an AE-LIMIT. Any next move
-(a different observation/AE/window, or an explicitly physics-structured latent) **changes the
-question** and requires a new charter — it is out of scope for latent v0.
+The terminal, honest result of latent v0 is that **with this reconstruction-trained AE and this
+observation / window family, the physics-consequence channel cannot be cleanly read from the learned
+latent** — so a learned transition-consistency signal `c_z` cannot be fairly tested for reproducing
+the analytic residual `r`. The minimal fidelity bump (24→48px) did not rescue it, and the matched-pair
+delta — the sharpest fair form of the question, isolating the hidden-mass consequence from render
+noise — comes back **negative**: the consequence does not reach the latent *difference*. The gates did
+their job: they refused to let an unreadable rig masquerade as a GREEN, a DEEP RED, or an AE-LIMIT.
+
+**Scope limit (read before citing):** this is **not** a general claim that learned latents cannot
+support physics auditability; it is a bounded result about this **reconstruction-trained** AE and this
+observation/window family (48×48 grayscale; frame interval 0.08s / `frame_stride=8`). The next
+variable to change is the **representation objective** (a predictive / JEPA-style / audit-preserving
+latent objective instead of reconstruction) — that **changes the question** and requires a new
+charter; it is out of scope for latent v0. See `FINDINGS_latent_v0.md` for the full closeout.
