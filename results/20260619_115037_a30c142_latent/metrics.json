@@ -1,0 +1,189 @@
+{
+  "eps_thr": 1.6515514575930095,
+  "or_false_alarm": 0.049833333333333334,
+  "missed_catastrophe": {
+    "clean": {
+      "n_cata": 300,
+      "u_z": 0.7266666666666667,
+      "d_z": 0.95,
+      "c_z": 0.11333333333333329,
+      "PORTFOLIO": 0.5666666666666667
+    },
+    "extrapolation": {
+      "n_cata": 2852,
+      "u_z": 0.23807854137447404,
+      "d_z": 0.43513323983169705,
+      "c_z": 0.07643758765778397,
+      "PORTFOLIO": 0.1307854137447405
+    },
+    "physics_shift": {
+      "n_cata": 299,
+      "u_z": 0.7290969899665551,
+      "d_z": 0.9531772575250836,
+      "c_z": 0.1605351170568562,
+      "PORTFOLIO": 0.5752508361204014
+    },
+    "id_holdout": {
+      "n_cata": 293,
+      "u_z": 0.8191126279863481,
+      "d_z": 0.9010238907849829,
+      "c_z": 0.11604095563139927,
+      "PORTFOLIO": 0.5563139931740615
+    }
+  },
+  "detect_auroc": {
+    "extrapolation": {
+      "u_z": 0.92783325,
+      "d_z": 0.8065863333333333,
+      "c_z": 0.8599450833333333
+    },
+    "physics_shift": {
+      "u_z": 0.5,
+      "d_z": 0.5,
+      "c_z": 0.5052770833333333
+    }
+  },
+  "gate_a": {
+    "floor": 0.6,
+    "clean": 0.31767302917798124,
+    "physics_shift": 0.3350027289292768,
+    "pooled": 0.3263788056437394,
+    "obs_t_plus_a_diagnostic_clean": 0.3161118312504153,
+    "PASS": false
+  },
+  "gate_b": {
+    "auroc_dz": 0.5,
+    "auroc_uz": 0.5,
+    "band": [
+      0.45,
+      0.55
+    ],
+    "max_abs_delta_dz": 0.0,
+    "max_abs_delta_uz": 0.0,
+    "PASS": true
+  },
+  "accel_recoverability": {
+    "recover_floor": 0.6,
+    "obs_next+a": {
+      "clean": {
+        "nonlinear_mean": 0.31767302917798124,
+        "nonlinear_per_joint": [
+          0.31865640511530624,
+          0.31668965324065623
+        ]
+      },
+      "physics_shift": {
+        "nonlinear_mean": 0.3350027289292768,
+        "nonlinear_per_joint": [
+          0.33991120576123957,
+          0.330094252097314
+        ]
+      },
+      "pooled": {
+        "nonlinear_mean": 0.3263788056437394,
+        "nonlinear_per_joint": [
+          0.32934909877032015,
+          0.32340851251715863
+        ]
+      }
+    },
+    "z_next+a": {
+      "nonlinear_mean": 0.3831016104494877,
+      "nonlinear_per_joint": [
+        0.3841009240038423,
+        0.3821022968951331
+      ]
+    },
+    "obs_next": {
+      "nonlinear_mean": 0.31281145066462196,
+      "nonlinear_per_joint": [
+        0.3412623997376669,
+        0.284360501591577
+      ]
+    },
+    "z_next": {
+      "nonlinear_mean": 0.3112094185312942,
+      "nonlinear_per_joint": [
+        0.3352802839143272,
+        0.2871385531482612
+      ]
+    },
+    "obs_t+a": {
+      "nonlinear_mean": 0.3161118312504153,
+      "nonlinear_per_joint": [
+        0.3335780119284909,
+        0.2986456505723397
+      ]
+    },
+    "z_t+a": {
+      "nonlinear_mean": 0.33751713340012945,
+      "nonlinear_per_joint": [
+        0.349914324680241,
+        0.32511994212001794
+      ]
+    }
+  },
+  "ae_capacity": {
+    "obs_next+a_clean": 0.31767302917798124,
+    "z_next+a_clean": 0.3831016104494877,
+    "margin": 0.125,
+    "consequence_reached_latent": true
+  },
+  "linear_probe_r2": {
+    "per_target_q1_q2_qd1_qd2": [
+      0.6665953644798023,
+      0.05125312541498106,
+      0.22645378834342578,
+      0.06617160681420786
+    ],
+    "mean": 0.2526184712631042,
+    "band": [
+      0.3,
+      0.9
+    ],
+    "role": "laundering ceiling: R2>0.9 => latent recovered privileged state"
+  },
+  "nonlinear_probe_r2": {
+    "per_target_q1_q2_qd1_qd2": [
+      0.7329690679102001,
+      0.2879135316639747,
+      0.7322614649985439,
+      0.41007771637863055
+    ],
+    "mean": 0.5408054452378374,
+    "role": "vacuity floor: low even here => latent truly discarded state"
+  },
+  "spearman": {
+    "c_z_vs_r": -0.18470050403395938,
+    "c_z_vs_d_z": 0.23820477197052645,
+    "rho_max_for_orthogonal": 0.8
+  },
+  "recon_gate": {
+    "ae_recon_clean": 0.004452940216631306,
+    "mean_frame_baseline": 0.01757588054937536,
+    "beat_factor_required": 1.5,
+    "beats_baseline": true,
+    "recon_physics_shift": 0.004409587155402109,
+    "shift_ratio": 0.9902641715113215,
+    "shift_ratio_max": 1.5,
+    "shift_comparable": true,
+    "per_regime": {
+      "clean": 0.004452940216631306,
+      "extrapolation": 0.008974094816402562,
+      "physics_shift": 0.004409587155402109,
+      "id_holdout": 0.004372105703325447
+    },
+    "PASS": true
+  },
+  "training_failed": {
+    "ae": false,
+    "ensemble": false
+  },
+  "verdict": {
+    "label": "VOID",
+    "interpret_table": false,
+    "reasons": [
+      "GATE A failed: output observation still does not carry q-double-dot (pooled R2=0.33, physics_shift R2=0.34, floor 0.6). Detector table NOT interpreted."
+    ]
+  }
+}

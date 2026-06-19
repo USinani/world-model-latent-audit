@@ -115,19 +115,14 @@ def render_frame(q, cfg: Config):
     return _render_poses(np.asarray(q, dtype=float)[None, :], cfg)[0]
 
 
-def render_batch(states, cfg: Config, rng, jitter=None):
-    """states: (N, 4) array of [q1, q2, qd1, qd2]. Returns (N, F*H*W) observations.
-    Each observation is a stacked window ending at the current pose; earlier frames
-    are back-extrapolated from qd. jitter=0 -> privileged clean render (no noise)."""
-    states = np.asarray(states, dtype=float)
-    N = len(states)
-    F = cfg.frame_stack
+def render_window(poses, cfg: Config, rng, jitter=None):
+    """poses: (N, F, 2) EXPLICIT joint angles for each of F stacked frames (no
+    back-extrapolation -- the caller supplies real simulated poses, so the window
+    can carry genuine curvature/acceleration). Returns (N, F*H*W) observations.
+    jitter=0 -> privileged clean render (no noise)."""
+    poses = np.asarray(poses, dtype=float)
+    N, F, _ = poses.shape
     n = cfg.img_size
-    q = states[:, 0:2]; qd = states[:, 2:4]
-    stride = getattr(cfg, "frame_stride", 1)
-    # build all poses: for k in [F-1 .. 0], pose = q - k*stride*dt*qd  -> (N, F, 2)
-    ks = np.arange(F - 1, -1, -1)[None, :, None]                  # (1, F, 1)
-    poses = q[:, None, :] - ks * (stride * cfg.dt) * qd[:, None, :]  # (N, F, 2)
     flat = poses.reshape(N * F, 2)
     frames = _render_poses(flat, cfg).reshape(N, F, n, n)
     j = cfg.nuisance_jitter if jitter is None else jitter
@@ -136,6 +131,23 @@ def render_batch(states, cfg: Config, rng, jitter=None):
         frames = frames + r.uniform(-j, j, size=frames.shape)
     frames = np.clip(frames, 0.0, 1.0)
     return frames.reshape(N, F * n * n)
+
+
+def render_batch(states, cfg: Config, rng, jitter=None):
+    """states: (N, 4) array of [q1, q2, qd1, qd2]. Returns (N, F*H*W) observations.
+    Each observation is a stacked window ending at the current pose; earlier frames
+    are back-extrapolated from qd (CONSTANT-VELOCITY; carries position+velocity but
+    no curvature). Retained for the state-space parity path; the latent experiment
+    now uses render_window with real simulated poses. jitter=0 -> clean render."""
+    states = np.asarray(states, dtype=float)
+    N = len(states)
+    F = cfg.frame_stack
+    q = states[:, 0:2]; qd = states[:, 2:4]
+    stride = getattr(cfg, "frame_stride", 1)
+    # build all poses: for k in [F-1 .. 0], pose = q - k*stride*dt*qd  -> (N, F, 2)
+    ks = np.arange(F - 1, -1, -1)[None, :, None]                  # (1, F, 1)
+    poses = q[:, None, :] - ks * (stride * cfg.dt) * qd[:, None, :]  # (N, F, 2)
+    return render_window(poses, cfg, rng, jitter=jitter)
 
 
 def obs_dim(cfg: Config):

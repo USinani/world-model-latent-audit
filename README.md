@@ -37,11 +37,15 @@ New (the minimal added surface):
   decay, finiteness guards) reused for the ensemble member, the AE, and the latent dynamics.
   Ports the recipe proven in `World_Models/src/world_models/models/mlp.py` (003B).
 - `metrics_np.py` — pure-numpy `roc_auc` (tie-aware Mann-Whitney) and `spearman`.
-- `render.py` — forward-kinematics grayscale frames; stacked window (`q̇` inferable, not
-  handed over) + fixed texture + pixel jitter (anti-laundering nuisance).
+- `render.py` — forward-kinematics grayscale frames; `render_window` rasterises explicit
+  stacked poses + fixed texture + pixel jitter (anti-laundering nuisance).
+- `windows.py` (LW-09) — vectorised RK4 (`rk4_batch`/`qddot_batch`, anchored to `arm._consts()`
+  with a runtime parity assert vs `arm.step_rk4`) building **real** forward/backward stacked
+  windows, so the output observation carries genuine curvature/acceleration.
 - `latent_model.py` — `LatentAE` (linear-bottleneck MLP autoencoder) + `LatentEnsemble`
   (bootstrap latent dynamics `(z_t, a_t) → z_{t+1}`).
-- `experiment_latent_failure_modes.py` — the v3 harness in latent space (the wedge).
+- `experiment_latent_failure_modes.py` — the v3 harness in latent space (the wedge); LW-09 adds
+  the curvature output window and pre-registered GATE A (obs carries q̈) / GATE B (no input leak).
 
 ## How to run
 
@@ -58,9 +62,10 @@ Dependencies: `numpy`, `matplotlib` only (see `requirements.txt`).
 ## Gated pipeline (each gate blocks the next)
 
 ```
-physics audit ─▶ M1 PARITY GATE ─▶ render+AE+ensemble ─▶ M3.5 RECON GATE ─▶ latent table ─▶ verdict
-                (r reproduces v3?)                       (AE competent?)     (c_z vs r's column)
-                   STOP if FAIL                            VOID if FAIL
+physics audit ─▶ M1 PARITY GATE ─▶ render+AE+ensemble ─▶ RECON GATE ─▶ GATE B (no input leak)
+                (r reproduces v3?)                       (AE competent?)   ─▶ GATE A (obs carries q̈)
+                   STOP if FAIL          VOID if FAIL        VOID if FAIL    ─▶ detector table ─▶ label
+                                                                              (VOID/AE-LIMIT/DEEP RED/GREEN)
 ```
 
 ## Ledger (claims, status, evidence)
@@ -73,57 +78,54 @@ physics audit ─▶ M1 PARITY GATE ─▶ render+AE+ensemble ─▶ M3.5 RECON 
 | LW-04 | **M3.5 recon gate**: AE beats mean-frame baseline & physics_shift recon comparable to clean | **PASS** | recon 0.0043 vs baseline 0.0176 (4.1×); physics_shift/clean ratio 1.00 |
 | LW-05 | Latent not laundered (linear R²(z→q,q̇) < 0.9) | **PASS** | linear R² = 0.25 |
 | LW-06 | Latent not vacuous (nonlinear probe recovers state) | **PASS** | nonlinear R² = 0.58 (state present, nonlinearly coded) |
-| LW-07 | **Hinge**: `c_z` reproduces `r`'s whole column | **RED** (detector level) | mirror of `r`: fires on extrapolation (20% missed), misses physics_shift (52% missed), Spearman vs `r` = −0.12 |
-| LW-08 | **q̈ adversarial check**: is the deep boundary established (mass-shift signature usable in `z`)? | **INCONCLUSIVE** | realized `q̈` only ~0.28–0.31 recoverable from `z+a` AND raw `frames+a` (floor 0.30) → attribution observation-limited; `which_red = inconclusive_observation_limit` |
+| LW-07 | **Hinge**: `c_z` reproduces `r`'s whole column | **VOID/unreadable** | observation under-encoded `q̈` (constant-velocity window); test was never fair — superseded by LW-09 |
+| LW-08 | **q̈ adversarial check**: is the deep boundary established (mass-shift signature usable in `z`)? | **INCONCLUSIVE** | realized `q̈` only ~0.28–0.31 recoverable from `z+a` AND raw `frames+a` (floor 0.30) → observation-limited; motivated the LW-09 rig fix |
+| LW-09 | **Curvature window + pre-registered gates**: make the latent audit interpretable | **VOID** | GATE B PASS (AUROC d_z/u_z = 0.500, leak Δ=0) and RECON PASS (4.0×, ratio 0.99), but **GATE A FAIL**: real curvature output window still yields only `q̈` R²≈0.33 from `obs_next+a` (and ~0.31–0.38 from every predictor incl. `z_next+a`) vs 0.60 floor. State-space `q̈` is 100% determined, so the loss is the 24×24 render + AE bottleneck. Detector table not interpreted; 0.60 not softened |
 
-## Latest result (full run; see `results/<latest>_latent/`)
+## Latest result — LW-09 (full run; see `results/<latest>_latent/`)
 
-Missed-catastrophe (lower = safer; thresholds calibrated on clean at 5% total false alarm):
+The output observation is now a **real curvature-carrying forward window** (simulated under the
+regime physics, ZOH action); the input window is a real backward window under nominal physics,
+**shared** across the matched clean/physics_shift pair. Result is decided by pre-registered gates.
 
-| regime | #cat | u_z | d_z | **c_z** | PORTFOLIO |
-|--------|-----:|----:|----:|--------:|----------:|
-| clean | 400 | 81.5% | 95.8% | 50.5% | 68.8% |
-| extrapolation | 3701 | 28.1% | 41.6% | **20.0%** | 12.3% |
-| physics_shift | 393 | 80.2% | 97.2% | **51.9%** | 69.7% |
-| id_holdout | 274 | 72.3% | 92.0% | 42.7% | 59.1% |
+| gate | requirement | result | status |
+|------|-------------|--------|:------:|
+| GATE B (no input leak) | AUROC(d_z),(u_z) clean-vs-shift ∈ [0.45, 0.55] | 0.500 / 0.500; matched-pair Δ = 0.0 | **PASS** |
+| RECON (output window) | recon ≥1.5× over mean-frame; shift ≤1.5× clean | 4.0× over baseline; shift/clean ratio 0.99 | **PASS** |
+| **GATE A** (obs carries q̈) | pooled **and** physics_shift `R²(obs_next+a → q̈)` > 0.60 | clean 0.318 / physics_shift 0.335 / **pooled 0.326** | **FAIL** |
 
-Laundering / vacuity: linear R²(z→q,q̇)=**0.25** (≪ 0.9 ceiling → not laundered);
-nonlinear R²=**0.58** (> 0.3 floor → not vacuous). Latent is *informative-but-nonlinear*.
-Spearman `c_z` vs withheld `r` = **−0.12**; Spearman `c_z` vs `d_z` = **0.13**.
+q̈ recoverability (nonlinear R², realized `q̈ = (q̇_next − q̇)/dt`, clean unless noted):
 
-Adversarial q̈ check (acceleration recoverability, the mass-shift's footprint):
-realized `q̈` is only **~0.28–0.31** recoverable (nonlinear R²) from `z+a`, raw `frames+a`,
-`z`, and `frames` alike — right at the 0.30 floor. `which_red = inconclusive_observation_limit`.
+| predictor | R²(→q̈) |
+|---|---:|
+| obs_next + a (gate; physics_shift 0.335, pooled 0.326) | 0.318 |
+| z_next + a | 0.383 |
+| obs_next | 0.313 |
+| z_next | 0.311 |
+| obs_t + a (diagnostic) | 0.316 |
+| z_t + a | 0.338 |
 
-### Verdict: RED at the detector level — deep-boundary attribution PROVISIONAL
+### Final label: VOID — the observation still does not carry q̈
 
-`c_z` does **not** reproduce `r`'s column. It is the mirror image of `r`:
+Every predictor sits at ~0.31–0.38; the added curvature and the action buy little, and the
+forward window (`obs_next`) is no better than the backward one (`obs_t`). In **state space**
+`q̈ = f(q, q̇, τ)` is 100% determined, so the missing ~2/3 is the 24×24 pixel render + AE
+bottleneck attenuating the consequence — **not** the physics. Leading cause: a scale mismatch —
+the window baseline is `frame_stride·dt = 0.08 s` (needed so velocity is visible at this
+resolution) while the target `q̈` is the **instantaneous** single-`dt` acceleration, which the
+coarse window cannot pin without more resolution.
 
-- `r` (analytic) catches physics_shift (0% missed) and is quiet on extrapolation (57% missed).
-- `c_z` (learned latent) **fires on extrapolation** (20% missed — it catches the regime where
-  *inputs* are novel) and **misses physics_shift** (52% missed). It correlates ≈0 with `r`.
-
-This detector-level RED is robust, and it is **not** "`c_z` is `d_z` in disguise" (`c_z`–`d_z`
-ρ=0.13). The *interpretation* — that a learned consistency check has no off-support guarantee
-and collapses toward novelty detection — is the leading hypothesis, **but the adversarial q̈
-check did not confirm it**: the acceleration the shift lives in is barely present in the
-observation itself (~0.30 from even the raw frames), because `render.py` back-extrapolates the
-stacked window at constant velocity (no within-window curvature). So part of `c_z`'s miss on
-physics_shift may be a representational shortfall rather than the deep limit. **The deep-boundary
-claim is not yet established.** Next step (a new render/data change, not done here): give the
-window real curvature so `q̈` is carried, then re-read whether `c_z` still misses physics_shift
-while `q̈` is recoverable from `z` (→ deep boundary) or not (→ representational fix).
+Per the pre-registered rule, with GATE A failing the **detector table is NOT interpreted** (it is
+saved in `metrics.json` for the record only). The 0.60 bar was **not** softened after seeing 0.33.
+This supersedes the LW-07/08 "RED", which was likewise unreadable — LW-09 proves it with the gate.
 
 ### Boundary paragraph (required output)
 
-This is **post-transition detection, not pre-action prevention**: every detector here fires
-*after* a step has been observed (`c_z` needs `image_{t+1}`), so it can audit a world model's
-predictions but cannot stop a catastrophe before it happens. The wedge's robust finding is that
-in this setup, a latent transition-consistency signal `c_z` does not reproduce the analytic
-residual `r`'s column — it fires on novel inputs and misses the consequence-only physics shift,
-the opposite of `r`. The deeper claim that this is *fundamental* to learned latents (rather than
-fixable by a richer observation that carries acceleration) is the open question the q̈ check
-flags: with a constant-velocity window the shift's signature is only ~0.30-recoverable even from
-raw pixels, so the boundary is *indicated but not proven*. Either way, physics-auditability does
-**not** transfer for free to latent world models on this evidence; whether it can transfer with
-a better observation is the next experiment.
+The honest result of this phase is that **the rig, not the detector, is the current limit**: a
+learned latent transition-consistency signal `c_z` cannot be fairly tested for reproducing the
+analytic residual `r` until the observation actually carries the consequence, and at this pixel +
+autoencoder fidelity the acceleration footprint of a mass change survives only ~1/3 — below the
+pre-registered interpretability bar. Fixing the window to carry curvature was **necessary but not
+sufficient**; a richer observation (higher render resolution, or a `q̈`-scale window) is required
+before any GREEN / DEEP RED / AE-LIMIT verdict on latent physics-auditability can be earned. The
+gates did their job: they refused to let an unreadable rig masquerade as a scientific boundary.

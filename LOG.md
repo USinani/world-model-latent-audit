@@ -112,6 +112,61 @@ curvature (forward multi-step window, or back-integrate with the true dynamics) 
 carried, re-verify recoverability, then re-read whether `c_z` still misses physics_shift while
 `q̈` is recoverable from `z` (→ deep boundary) or not (→ representational fix).
 
+## LW-09 — curvature output window + pre-registered gates (new commit after a30c142)
+
+The M-verify check left the LW-07/08 result unreadable: the constant-velocity window did not
+carry `q̈`, and physics_shift is an acceleration-level consequence, so `c_z` was never given a
+fair test. LW-09 fixes the rig and re-decides under pre-registered gates.
+
+**What changed (rig):**
+- `obs_next = [f_t, f_{t+1}, f_{t+2}]` is now a **real forward window** simulated under the
+  regime physics (nominal for clean, heavy for physics_shift) with zero-order-hold action, so
+  the window carries genuine curvature/acceleration. `obs_t = [f_{t-2}, f_{t-1}, f_t]` is a
+  **real backward window under NOMINAL physics**, built **once** from the shared input states and
+  reused for the matched clean/physics_shift pair (so hidden mass cannot leak into the input).
+- New `windows.py`: vectorised RK4 (`rk4_batch`/`qddot_batch`) reading the audited `arm._consts()`,
+  guarded by a runtime parity assert vs scalar `arm.step_rk4`. `render.render_window` renders
+  explicit poses (no back-extrapolation).
+- `eps` now compares the prediction against the **non-jittered regime-specific** `obs_next_true`
+  (heavy for physics_shift), never against nominal. Detectors, 5% calibration, and `missed()` are
+  unchanged (no threshold tuning).
+
+**GATE B — no hidden-physics leak into `obs_t` (PASS):** AUROC(d_z)=0.500, AUROC(u_z)=0.500,
+matched-pair max|Δ|=0.0 (exact, by shared-`obs_t` construction; the gate is the regression guard).
+
+**RECON GATE (on the output window) — PASS:** recon 0.0044 vs mean-frame baseline 0.0176 (**4.0×**);
+physics_shift/clean recon ratio **0.99**.
+
+**GATE A — output observation carries `q̈` (FAIL → VOID).** Hard gate: pooled AND physics_shift
+`nonlinear R²(obs_next + a → q̈) > 0.60`.
+
+| predictor → realized q̈ | clean | physics_shift | pooled |
+|---|---:|---:|---:|
+| **obs_next + a** (gate) | 0.318 | 0.335 | **0.326** |
+| obs_next | 0.313 | — | — |
+| obs_t + a (diagnostic) | 0.316 | — | — |
+| z_next + a | 0.383 | — | — |
+| z_next | 0.311 | — | — |
+| z_t + a | 0.338 | — | — |
+
+Everything clusters at ~0.31–0.38; action and the added curvature buy little, and forward
+(`obs_next`) ≈ backward (`obs_t`). In **state space** `q̈ = f(q, q̇, τ)` is 100% determined, so the
+~2/3 loss is the 24×24 pixel render + AE bottleneck attenuating the consequence — not physics.
+The leading cause is a scale mismatch: the window baseline is `frame_stride·dt = 0.08 s` (needed so
+velocity is visible at 24×24), while the target `q̈ = (q̇_next − q̇)/dt` is the **instantaneous**
+single-`dt` acceleration; the coarse window cannot pin the fine-scale `q̈`, and higher resolution
+would be needed to have both.
+
+**FINAL LABEL: VOID — output observation still does not carry `q̈` (pooled R²=0.33 < 0.60 floor).**
+Per the pre-registered rule the detector table is **NOT interpreted** (recorded for the file only:
+`c_z` looks low-miss everywhere, i.e. a universal post-transition error detector — but that reading
+is not licensed while GATE A fails). The 0.60 bar was **not** softened after seeing 0.33.
+
+This supersedes the LW-07/08 "RED": that result was likewise unreadable, and LW-09 now says so
+honestly with the gate that proves it. Recommended next step (a further rig change, out of scope
+here): align the `q̈` target to the window scale (or raise render resolution / shrink stride with a
+larger image) so the consequence clears the 0.60 bar, then re-read `c_z`.
+
 ## Notes / open threads
 
 - Seeds fixed; full run ~1.5–2 min on CPU. `--quick` for smoke.
