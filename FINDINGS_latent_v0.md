@@ -1,13 +1,17 @@
 # Findings — latent v0 (closeout)
 
-**Bounded result:** A reconstruction-trained autoencoder latent did not preserve the
-hidden-mass consequence delta required for residual-like self-verification.
+**Bounded result:** Latent v0 closes with a bounded mechanism-level negative: the hidden-mass
+consequence delta was well-posed in the auditor, recoverable from rendered observations at matched
+12-D capacity, but not preserved by this reconstruction-trained AE stack in `z`.
 
 **Formal label:** `VOID-FIDELITY` (terminal for latent v0).
-**Scientific interpretation:** `VOID-FIDELITY / consequence-not-encoded` — the formal label is
-exactly `VOID-FIDELITY`, but the binding evidence is the **negative matched-pair delta**, so the
-result is read as "the physics consequence was not encoded into the latent," not merely "the
-observation was too coarse."
+**Scientific interpretation:** `Branch C / available consequence not preserved by this
+reconstruction-trained AE stack`. The formal label is exactly `VOID-FIDELITY`; the binding evidence is
+the **negative matched-pair latent delta** (`R²(Δz_next → Δqdd_window) = −0.175`) set against the
+**matched-capacity, matched-probe raw-observation delta** (`R²(Δraw_obs_next → Δqdd_window) = 0.716`,
+PCA→12) and the analytic oracle (`R²(Δtrue_pose → Δqdd_window) = 0.992`). So the consequence was
+available in the observation and was not preserved in the latent — not merely "the observation was too
+coarse." (See the Addendum below for the full ceiling diagnostic.)
 
 This memo is the single-page closeout. The gate-by-gate build is in
 [LOG.md](LOG.md) (LW-11 section); the claim ledger is in [README.md](README.md); the canonical run
@@ -59,11 +63,16 @@ two binding gates.
 
 ## Scope limit (read this before citing)
 
-This is **not** a general claim that learned latents cannot support physics auditability. It is a
-bounded result about **this reconstruction-trained AE** and **this observation/window family**
-(48×48 grayscale stacked windows; frame interval 0.08s / `frame_stride=8`; ZOH action). The training
-objective was image reconstruction; nothing in that objective rewards preserving the second-order
-mass-consequence delta, and the result is that the delta was not preserved.
+This is **not** a general claim that learned latents cannot support physics auditability, and **not**
+a general claim about all reconstruction objectives. It is a bounded result about **this
+reconstruction-trained AE** and **this observation/window family** (48×48 grayscale stacked windows;
+frame interval 0.08s / `frame_stride=8`; ZOH action).
+
+**Bounded mechanism hypothesis (this stack only):** under this reconstruction objective and
+architecture, the learned latent allocated its limited capacity to reconstruction-relevant visual
+structure rather than to the low-variance but audit-relevant consequence delta. This is a bounded
+mechanism hypothesis for this stack, not a general claim about all reconstruction objectives or all
+learned latents.
 
 ## Next variable (named, not implemented)
 
@@ -88,6 +97,11 @@ to preserve it, or was it absent/unresolved before the AE ever saw it?* This is 
 reduced to `latent_dim=12` by PCA and the same 3-seed nonlinear probe. The reconstruction was anchored
 by reproducing the committed LW-11 capacity-matched obs probe: **0.349** (committed 0.345; per-seed
 0.372/0.395/0.282 vs 0.373/0.397/0.266) — faithful.
+
+The raw-observation and latent delta comparisons used the same 3-seed nonlinear probe policy (the
+identical `_multiseed_r2`/`_nl_fit` MLP with `PROBE_SEEDS=(7,17,27)` and the same `Δqdd_window`
+targets that the committed LW-11 latent delta gate used), so the 0.891 gap is a matched-capacity,
+matched-probe comparison.
 
 **Results (48×48; `frame_stride=8`; PCA→12; seeds 7/17/27):**
 
