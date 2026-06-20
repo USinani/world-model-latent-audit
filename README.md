@@ -1,6 +1,71 @@
-# Latent_Wedge
+# Verification Wedge
 
-A lean, self-contained experiment that asks **one** question:
+A controlled audit wedge for testing whether learned world-model latents preserve hidden-cause physical consequences needed for self-verification.
+
+Core v0 result: in a 2-link-arm audit rig, a hidden-mass consequence delta was well-posed in the auditor (R²=0.992) and recoverable from rendered observations at matched 12-D capacity (R²=0.716), but not preserved by this reconstruction-trained AE latent (R²=-0.175).
+
+This repository is intended to be attacked.
+
+## Thesis
+
+Self-verifying world models are only auditable if the learned latent actually *contains* the
+physical consequence a verifier would check. This wedge holds the observable input fixed and changes
+only a hidden cause (a mass change), so the two futures differ *only* in their physical consequence —
+then asks whether that consequence survives into the latent.
+
+## The causal chain — where the consequence survives, and where it dies
+
+Same matched clean/heavy pairs, same window-scale acceleration target `Δqdd_window`, same 3-seed
+nonlinear probe, capacity matched at 12 dimensions (the raw observation reduced to 12 PCA components).
+
+| stage | probe | R² to `Δqdd_window` | reading |
+|---|---|---:|---|
+| auditor | `Δtrue_pose_window` | **0.992** | consequence is well-posed in the auditor |
+| observation | `Δraw_obs_next` (PCA-12) | **0.716** | recoverable from the rendered observation at matched capacity |
+| latent | `Δz_next` | **−0.175** | not preserved in the learned latent |
+
+The consequence is present right up to the encoder, then disappears (`pixel_minus_latent_gap = 0.891`).
+The formal verdict of this run is **VOID-FIDELITY**: the latent-space verifier comparison is not
+readable because the signal it needs is absent from the latent.
+
+Full argument, confound-elimination, and reviewer questions: **[docs/verification_wedge_claim_packet_v0.md](docs/verification_wedge_claim_packet_v0.md)**.
+
+## Scope limits (read before citing)
+
+- Not a general claim about reconstruction objectives, and not a general claim about learned latents.
+- Bounded to **this** reconstruction-trained AE and **this** observation/window family (48×48
+  grayscale stacked windows; frame interval 0.08s / `frame_stride=8`).
+- Mechanism is a bounded hypothesis for this stack (limited capacity allocated to
+  reconstruction-relevant visual structure rather than the low-variance audit-relevant consequence
+  delta) — explicitly **not** "reconstruction objectives discard physical consequences."
+- No detector table is interpreted in latent v0 after the VOID-FIDELITY verdict; the transfer matrix
+  has not been started.
+
+## Intended to be attacked
+
+This is a critique artifact, not a paper. The fastest way to help is to try to break it: a missed
+confound, a wrong-timescale target, a probe mismatch, or a reproduction that disagrees. Open an issue
+using the **[critique template](.github/ISSUE_TEMPLATE/critique.md)** (GitHub will offer it
+automatically under *New issue*).
+
+## Reproducing
+
+Quick start in **[REPRODUCING.md](REPRODUCING.md)**. Dependencies are `numpy` + `matplotlib` only.
+Canonical metrics live in:
+
+- `results/20260619_103342_nogit_failuremodes/metrics.json` — state-space parity gate.
+- `results/20260619_193900_33faabb_latent/metrics.json` — latent LW-11 terminal run
+  (`gate_a`, `gate_b`, `delta_gate`).
+
+---
+
+# Detailed result ledger
+
+The remainder of this document is the full experiment-level record (build provenance, the gated
+pipeline, the per-claim ledger, and the terminal LW-11 read). It is kept for reproducibility and
+audit; the public summary above is the front door.
+
+The original question, stated precisely:
 
 > When analytic state `(q, q̇, τ)` and the physics equation are **hidden** behind an
 > autoencoder, can a learned latent transition-consistency signal `c_z` recover the
@@ -8,12 +73,7 @@ A lean, self-contained experiment that asks **one** question:
 > that latent input-detectors are blind to — **without** the latent secretly
 > recovering the privileged state?
 
-If yes, physics-auditability transfers to latent (V-JEPA/Dreamer-shaped) world models.
-If no, physics-violation detection needs privileged state — a hard limit worth naming.
-
 The full spec is `Latent_Wedge_CHARTER.md` (one page; the single source of truth).
-This folder deliberately carries **only** experiment-level discipline (this README
-ledger + `LOG.md` + sanity tests). No program-level control plane is replicated here.
 
 **Terminal result of latent v0:** `VOID-FIDELITY` — a reconstruction-trained AE latent did not
 preserve the hidden-mass consequence delta required for residual-like self-verification. The
