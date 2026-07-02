@@ -4,7 +4,7 @@
 |-------|-------|
 | Repo | USinani/world-model-latent-audit |
 | Branch | `public-v0.1-release-prep` |
-| HEAD | `d782caa` |
+| HEAD | `1773446` (local; not pushed) |
 | Date | 2026-07-02 |
 
 ## Pass/fail table
@@ -15,7 +15,7 @@
 | 2 | stale 0.08/0.15/0.73 grep | PASS (audit only — see hits table) |
 | 3 | commit pointers (`583974e`, `a3c0221`, `d54b9a6`) | PASS |
 | 4 | relative links | PASS |
-| 5 | write-up link in README | **PENDING** until https://sinani.ai/latent-audit returns HTTP 200 |
+| 5 | write-up link in README | **PENDING deploy** — line added locally; flip to PASS after https://sinani.ai/latent-audit returns HTTP 200 |
 | 6 | test suite | PASS |
 
 ## Item 2 — Stale headline grep (report only)
@@ -97,4 +97,18 @@ python3 tests/test_numpy_swaps.py  # 7/7 PASS
 | When | Files | Message |
 |------|-------|---------|
 | 2026-07-02 | `RELEASE_CHECK.md` | Add v0.1 release readiness check |
-| pending | `README.md`, `RELEASE_CHECK.md` | Add public write-up link (after sinani.ai live) |
+| pending | `README.md`, `RELEASE_CHECK.md` | Add public write-up link (local commit; push after sinani.ai verified live) |
+
+## Local verification (2026-07-02)
+
+Sinani page served locally from `/Users/uljan/Desktop/Sinani`:
+
+```bash
+cd /Users/uljan/Desktop/Sinani && python3 -m http.server 8765
+# http://localhost:8765/latent-audit/ → 200
+# card 003 link → /latent-audit
+```
+
+Outbound links on page: all return 200 (github, arxiv×2, permissioning.ai).
+
+**No remote pushes performed** — deploy when locally verified and approved.

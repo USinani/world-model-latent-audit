@@ -6,6 +6,8 @@ Core v0 result: in a 2-link-arm audit rig, a hidden-mass consequence delta was w
 
 This repository is intended to be attacked.
 
+**Write-up:** https://sinani.ai/latent-audit
+
 ## Thesis
 
 Self-verifying world models are only auditable if the learned latent actually *contains* the
