@@ -1,4 +1,8 @@
-# Verification Wedge
+---
+Write-up: https://sinani.ai/latent-audit  # pending — page not live yet
+---
+
+# World-Model Latent Audit
 
 A controlled audit wedge for testing whether learned world-model latents preserve hidden-cause physical consequences needed for self-verification.
 
@@ -124,7 +128,28 @@ python experiment_latent_failure_modes.py  # the latent wedge (writes results/*_
 # add --quick to either experiment for a fast smoke run
 ```
 
+### What a successful reproduction looks like
+
+Each run writes a timestamped folder under `results/`. A successful
+reproduction of the headline result shows, in the run's `metrics.json`:
+
+- delta-gate probe (latent, Δz_next → Δqdd_window): mean R² ≈ −0.175
+  (3-seed variance ≈ ±0.016)
+- capacity-matched observation control (PCA-12): R² ≈ 0.716
+- analytic auditor: R² ≈ 0.992
+- input-leak check (Gate B): AUROC ≈ 0.500 (chance — this is the
+  expected/correct value)
+
+Approximate wall-clock time on an M-series laptop: ~5 minutes total (tests <1 min; parity ~30 s; latent ~4 min)
+
+If your numbers differ materially, please open an issue using the
+critique template — that is the point of this repository.
+
 Dependencies: `numpy`, `matplotlib` only (see `requirements.txt`).
+
+Tested on Python 3.11 with the pinned versions in `requirements.txt`.
+Runs are seeded; residual variance across the 3 probe seeds is
+reported above.
 
 ## Gated pipeline (each gate blocks the next)
 

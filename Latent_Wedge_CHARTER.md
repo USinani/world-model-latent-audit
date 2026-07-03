@@ -1,4 +1,4 @@
-# Latent_Wedge — charter & build spec (the one spec; supersedes prior packets)
+# World-Model Latent Audit — charter & build spec (the one spec; supersedes prior packets)
 
 ## Hinge (one question)
 
